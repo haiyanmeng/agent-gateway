@@ -1,0 +1,80 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10001
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  path: "/mcp"
+                route:
+                  cluster: mcp_service
+          http_filters:
+          - name: envoy.filters.http.mcp
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+          - name: envoy.filters.http.rbac
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+              # "Default Deny": Block all requests unless a policy explicitly allows them.
+              rules:
+                action: DENY
+                policies:
+                  "deny-admin-and-add-tool":
+                    principals:
+                      - header:
+                          name: "x-user-role"      # The header to check
+                          string_match:
+                            exact: "admin"      # The required role
+                    permissions:
+                      - and_rules:
+                          rules:
+                            - metadata:
+                                  filter: "mcp_proxy"
+                                  path:
+                                    - key: "method"
+                                  value:
+                                    string_match:
+                                      exact: "tools/call"
+                            - metadata:
+                                  filter: "mcp_proxy"
+                                  path:
+                                    - key: "params"
+                                    - key: "name"
+                                  value:
+                                    string_match:
+                                      exact: "add"
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: mcp_service
+    type: STATIC
+    load_assignment:
+      cluster_name: mcp_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 9000
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9001
