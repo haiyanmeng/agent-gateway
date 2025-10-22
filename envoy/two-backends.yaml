@@ -1,8 +1,3 @@
-# discuss points with Boteng:
-# * prefix_rewrite
-# * the rbac filter does not work as expected. 
-# * are there other ways to config this?
-# * Is it too strict trying to map a TooAuthRule to an Envoy RBAC filter policy?
 static_resources:
   listeners:
   - name: listener_0
@@ -62,11 +57,13 @@ static_resources:
                                 path:
                                   - key: "method"
                                 value:
-                                  list_match:
-                                    one_of:
-                                      string_match:
+                                  or_match:
+                                    value_matchers:
+                                    - string_match:
                                         exact: "initialize"
-                                      string_match:
+                                    - string_match:
+                                        exact: "notifications/initialized"
+                                    - string_match:
                                         exact: "tools/list"
                     "allow-admin-to-call-server1-add-tool":
                       principals:
