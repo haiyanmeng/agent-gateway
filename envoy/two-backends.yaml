@@ -65,7 +65,7 @@ static_resources:
                                         exact: "notifications/initialized"
                                     - string_match:
                                         exact: "tools/list"
-                    "allow-admin-to-call-server1-add-tool":
+                    "allow-admin-to-call-server1-subtract-tool":
                       principals:
                       - and_ids:
                           ids:
@@ -95,8 +95,8 @@ static_resources:
                                   - key: "name"
                                 value:
                                   string_match:
-                                    exact: "add"
-                    "allow-admin-to-call-server2-subtract-tool":
+                                    exact: "subtract"
+                    "allow-admin-to-call-server2-add-tool":
                       principals:
                       - and_ids:
                           ids:
@@ -126,7 +126,7 @@ static_resources:
                                   - key: "name"
                                 value:
                                   string_match:
-                                    exact: "subtract"
+                                    exact: "add"
             - name: envoy.filters.http.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
