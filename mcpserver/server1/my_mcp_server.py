@@ -29,4 +29,4 @@ def personalized_greeting(name: str) -> str:
 
 # 5. Make the server runnable
 if __name__ == "__main__":
-    mcp.run(transport="http", host="127.0.0.1", port=9000)
+    mcp.run(transport="http", host="0.0.0.0", port=9000)
