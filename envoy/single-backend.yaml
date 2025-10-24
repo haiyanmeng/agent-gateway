@@ -64,10 +64,12 @@ static_resources:
                           - url_path:
                               path:
                                 prefix: "/server1/mcp"
-                          - header:
-                              name: "x-user-role"      # The header to check
-                              string_match:
-                                exact: "admin"      # The required role
+                          - or_ids:
+                              ids:
+                              - header:
+                                  name: "x-user-role"
+                                  string_match:
+                                    exact: "default/sa1"
                       permissions:
                       - and_rules:
                           rules:
