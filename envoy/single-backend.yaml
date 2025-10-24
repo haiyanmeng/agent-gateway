@@ -38,11 +38,6 @@ static_resources:
                       permissions:
                       - and_rules:
                           rules:
-                          - or_rules:
-                              rules:
-                              - url_path:
-                                  path:
-                                    prefix: "/server1/mcp"
                           - sourced_metadata:
                               metadata_matcher: 
                                 filter: "mcp_proxy"

@@ -43,14 +43,6 @@ static_resources:
                       permissions:
                       - and_rules:
                           rules:
-                          - or_rules:
-                              rules:
-                              - url_path:
-                                  path:
-                                    prefix: "/server1/mcp"
-                              - url_path:
-                                  path:
-                                    prefix: "/server2/mcp"
                           - sourced_metadata:
                               metadata_matcher: 
                                 filter: "mcp_proxy"
@@ -72,10 +64,12 @@ static_resources:
                           - url_path:
                               path:
                                 prefix: "/server1/mcp"
-                          - header:
-                              name: "x-user-role"      # The header to check
-                              string_match:
-                                exact: "admin"      # The required role
+                          - or_ids:
+                              ids:
+                              - header:
+                                  name: "x-user-role"
+                                  string_match:
+                                    exact: "default/sa1"
                       permissions:
                       - and_rules:
                           rules:
@@ -103,10 +97,12 @@ static_resources:
                           - url_path:
                               path:
                                 prefix: "/server2/mcp"
-                          - header:
-                              name: "x-user-role"      # The header to check
-                              string_match:
-                                exact: "admin"      # The required role
+                          - or_ids:
+                              ids:
+                              - header:
+                                  name: "x-user-role"
+                                  string_match:
+                                    exact: "default/sa2"
                       permissions:
                       - and_rules:
                           rules:
@@ -125,8 +121,12 @@ static_resources:
                                   - key: "params"
                                   - key: "name"
                                 value:
-                                  string_match:
-                                    exact: "add"
+                                  or_match:
+                                    value_matchers:
+                                    - string_match:
+                                        exact: "add"
+                                    - string_match:
+                                        exact: "subtract"
             - name: envoy.filters.http.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
