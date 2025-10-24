@@ -1,0 +1,202 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10001
+    filter_chains:
+      - filters:
+        - name: envoy.filters.network.http_connection_manager
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            stat_prefix: ingress_http
+            route_config:
+              name: local_route
+              virtual_hosts:
+              - name: local_service
+                domains: ["*"]
+                routes:
+                - match:
+                    path: "/mcp-server1/mcp"
+                  route:
+                    cluster: mcp-server1
+                    prefix_rewrite: "/mcp"
+                - match:
+                    path: "/mcp-server2/mcp"
+                  route:
+                    cluster: mcp-server2
+                    prefix_rewrite: "/mcp"
+                    # The host header will be rewritten to the upstream's hostname
+                    host_rewrite_literal: mcp.deepwiki.com
+            http_filters:
+            - name: envoy.filters.http.mcp
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+            - name: envoy.filters.http.rbac
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+                rules:
+                  action: ALLOW
+                  policies:
+                    "allow-anyone-to-initialize-and-list-tool":
+                      principals:
+                      - any: true
+                      permissions:
+                      - and_rules:
+                          rules:
+                          - sourced_metadata:
+                              metadata_matcher: 
+                                filter: "mcp_proxy"
+                                path:
+                                  - key: "method"
+                                value:
+                                  or_match:
+                                    value_matchers:
+                                    - string_match:
+                                        exact: "initialize"
+                                    - string_match:
+                                        exact: "notifications/initialized"
+                                    - string_match:
+                                        exact: "tools/list"
+                    "mcp-server1-rule-0":
+                      principals:
+                      - and_ids:
+                          ids:
+                          - url_path:
+                              path:
+                                prefix: "/mcp-server1/mcp"
+                          - or_ids:
+                              ids:
+                              - header:
+                                  name: "x-user-role"
+                                  string_match:
+                                    exact: "default/sa1"
+                      permissions:
+                      - and_rules:
+                          rules:
+                          - sourced_metadata:
+                              metadata_matcher: 
+                                filter: "mcp_proxy"
+                                path:
+                                  - key: "method"
+                                value:
+                                  string_match:
+                                    exact: "tools/call"
+                          - sourced_metadata:
+                              metadata_matcher:
+                                filter: "mcp_proxy"
+                                path: 
+                                  - key: "params"
+                                  - key: "name"
+                                value:
+                                  or_match:
+                                    value_matchers:
+                                    - string_match:
+                                        exact: "add"
+                                    - string_match:
+                                        exact: "subtract"
+                    "mcp-server1-rule-1":
+                      principals:
+                      - and_ids:
+                          ids:
+                          - url_path:
+                              path:
+                                prefix: "/mcp-server1/mcp"
+                          - or_ids:
+                              ids:
+                              - header:
+                                  name: "x-user-role"
+                                  string_match:
+                                    exact: "default/sa2"
+                      permissions:
+                      - and_rules:
+                          rules:
+                          - sourced_metadata:
+                              metadata_matcher: 
+                                filter: "mcp_proxy"
+                                path:
+                                  - key: "method"
+                                value:
+                                  string_match:
+                                    exact: "tools/call"
+                          - sourced_metadata:
+                              metadata_matcher:
+                                filter: "mcp_proxy"
+                                path: 
+                                  - key: "params"
+                                  - key: "name"
+                                value:
+                                  string_match:
+                                    exact: "subtract"
+                    "mcp-server2-rule-0":
+                      principals:
+                      - and_ids:
+                          ids:
+                          - url_path:
+                              path:
+                                prefix: "/mcp-server2/mcp"
+                          - or_ids:
+                              ids:
+                              - header:
+                                  name: "x-user-role"
+                                  string_match:
+                                    exact: "default/sa2"
+                      permissions:
+                      - and_rules:
+                          rules:
+                          - sourced_metadata:
+                              metadata_matcher: 
+                                filter: "mcp_proxy"
+                                path:
+                                  - key: "method"
+                                value:
+                                  string_match:
+                                    exact: "tools/call"
+                          - sourced_metadata:
+                              metadata_matcher:
+                                filter: "mcp_proxy"
+                                path: 
+                                  - key: "params"
+                                  - key: "name"
+                                value:
+                                  string_match:
+                                    exact: "read_wiki_structure"
+            - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: mcp-server1
+    type: STATIC
+    load_assignment:
+      cluster_name: mcp-server1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 9000
+  - name: mcp-server2
+    type: LOGICAL_DNS
+    load_assignment:
+      cluster_name: mcp-server2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: mcp.deepwiki.com
+                port_value: 443
+    transport_socket:     # Added this section to enable TLS for HTTPS
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: mcp.deepwiki.com # Server Name Indication is required for TLS handshake
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9002
