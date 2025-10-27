@@ -2,8 +2,9 @@
 import asyncio
 import os
 from fastmcp.client import Client
+from fastmcp.client.transports import StreamableHttpTransport
 
-server_url = os.environ.get("MCP_SERVER_URL", "http://server1-svc:9000/mcp")
+server_url = os.environ.get("MCP_SERVER_URL", "http://envoy-service:10001/mcp-server1/mcp")
 
 # The standard path where the service account token is mounted.
 TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -35,33 +36,32 @@ async def main():
     # For security, only print a portion of the token in logs.
     print(f"Successfully read the service account token (first 8 chars): {token[:8]}...")
 
-    # 1. Define custom headers to pass the service account token.
-    # The key "x-user-role" is what the Envoy RBAC filter is configured to check.
-    my_headers = {
-        "x-user-role": token
-    }
-
-    # Initialize the client, pointing to our server's address
-    client = Client(server_url)
-    # Set the custom headers on the client instance
-    client.headers = my_headers
+    # With custom headers for authentication
+    transport = StreamableHttpTransport(
+        url=server_url,
+        headers={
+        "x-k8s-sa-token": token,
+        "x-user-role": "default/sa1",
+        }
+    )
+    client = Client(transport)
 
     try:
         async with client:
             print("✅ Connection successful!")
 
-            # 2. Discover available resources
-            print("\n🔍 Discovering resources...")
-            resources = await client.list_resources()
-            for res in resources:
-                print(f"  - Found resource: '{res.name}' ({res.uri})")
+            # # 2. Discover available resources
+            # print("\n🔍 Discovering resources...")
+            # resources = await client.list_resources()
+            # for res in resources:
+            #     print(f"  - Found resource: '{res.name}' ({res.uri})")
 
-            # 3. Read the content of the first resource found
-            if resources:
-                resource_uri = resources[0].uri
-                print(f"\n📖 Reading content from '{resource_uri}'...")
-                content = await client.read_resource(resource_uri)
-                print(f"  - Content: '{content}'")
+            # # 3. Read the content of the first resource found
+            # if resources:
+            #     resource_uri = resources[0].uri
+            #     print(f"\n📖 Reading content from '{resource_uri}'...")
+            #     content = await client.read_resource(resource_uri)
+            #     print(f"  - Content: '{content}'")
 
             # 4. Discover available tools
             print("\n🛠️ Discovering tools...")
