@@ -1,0 +1,1 @@
+kubectl create configmap envoy-config --from-file=deepwiki_calculator_k8s.yaml
