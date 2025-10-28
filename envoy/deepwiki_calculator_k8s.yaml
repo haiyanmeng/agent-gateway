@@ -61,6 +61,23 @@ static_resources:
                 rules:
                   action: ALLOW
                   policies:
+                    "allow-mcp-session-close":
+                          principals:
+                            # Both of the following conditions must be true for the request to match
+                            - and_ids:
+                                ids:
+                                  # Condition 1: The HTTP method must be DELETE
+                                  - header:
+                                      name: ":method"
+                                      string_match:
+                                        exact: "DELETE"
+                                  # Condition 2: The 'mcp-session-id' header must exist
+                                  - header:
+                                      name: "mcp-session-id"
+                                      present_match: true
+                          permissions:
+                            # If the principal (the request's identity) matches, allow it
+                            - any: true
                     "allow-anyone-to-initialize-and-list-tool":
                       principals:
                       - any: true
