@@ -5,7 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install any needed packages specified in requirements.txt
-RUN pip install fastmcp
+RUN pip install fastmcp aiohttp
 
 # Copy the current directory contents into the container at /app
 COPY agent.py .

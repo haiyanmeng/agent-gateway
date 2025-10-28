@@ -1,2 +1,5 @@
-docker build --no-cache -t hmeng/agent:v7 .
-docker push docker.io/hmeng/agent:v7
+docker build --no-cache -t hmeng/agent:v13 .
+docker push docker.io/hmeng/agent:v13
+kubectl apply -f k8s_resources_agent1.yaml
+kubectl apply -f k8s_resources_agent2.yaml
+

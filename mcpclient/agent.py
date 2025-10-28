@@ -1,6 +1,7 @@
 # agent.py
 import asyncio
 import os
+import aiohttp
 from fastmcp.client import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
@@ -25,6 +26,33 @@ def get_sa_token():
     except Exception as e:
         print(f"An error occurred while reading the token: {e}")
         return None
+    
+async def retry_call_tool(client, tool_name, arguments, retries=3, timeout=5.0):
+    for attempt in range(retries):
+        try:
+            # Wrap the call with a timeout
+            result = await asyncio.wait_for(
+                client.call_tool(tool_name, arguments=arguments),
+                timeout=timeout
+            )
+            print(f"DEBUG: Tool call result on attempt {attempt + 1}: {result}")
+
+            # Check if the result indicates a 403 error
+            if "403" in str(result) or "Forbidden" in str(result):
+                print(f"⚠️ Received 403 Forbidden for tool '{tool_name}'. Retrying in {2 ** attempt} seconds...")
+                await asyncio.sleep(2 ** attempt)
+                continue # Move to the next attempt
+            else:
+                # If it's not a 403 error, return the result
+                return result
+
+        except asyncio.TimeoutError:
+            print(f"⌛️ Tool call to '{tool_name}' timed out after {timeout} seconds. Retrying in {2 ** attempt} seconds...")
+            await asyncio.sleep(2 ** attempt)
+            continue # Move to the next attempt
+            
+    # If all retries fail, raise an exception
+    raise Exception(f"Failed to call tool '{tool_name}' after {retries} attempts.")
 
 async def main():
     """
@@ -33,10 +61,7 @@ async def main():
     token = get_sa_token()
     if not token:
         print(f"Could not obtain a service account token. Exiting.")
-        return
-
-    # For security, only print a portion of the token in logs.
-    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...\n")
+    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...  v13\n")
 
     # With custom headers for authentication
     transport_calculator = StreamableHttpTransport(
@@ -47,16 +72,6 @@ async def main():
     )
     client_calculator = Client(transport_calculator)
     print(f"🤖 Agent starting up and connecting to {server_url_calculator}...\n")
-
-
-    transport_deepwiki = StreamableHttpTransport(
-        url=server_url_deepwiki,
-        headers={
-            "x-k8s-sa-token": token,
-        }
-    )
-    client_deepwiki = Client(transport_deepwiki)
-    print(f"🤖 Agent starting up and connecting to {server_url_deepwiki}...\n")
 
     try:
         async with client_calculator:
@@ -97,7 +112,16 @@ async def main():
         print(f"❌ An error occurred: {e}")
     finally:
         print(f"\n🔌 Connection closed. Agent shutting down.\n\n")
-    
+
+    transport_deepwiki = StreamableHttpTransport(
+        url=server_url_deepwiki,
+        headers={
+            "x-k8s-sa-token": token,
+        }
+    )
+    client_deepwiki = Client(transport_deepwiki)
+    print(f"🤖 Agent starting up and connecting to {server_url_deepwiki}...\n")
+
     try:
         async with client_deepwiki:
             print(f"✅ Connection successful!")
@@ -113,18 +137,18 @@ async def main():
                 tool_name = "read_wiki_structure"
                 repo = "kubernetes/kubernetes"
                 print(f"\n▶️ Calling tool '{tool_name}' with parameter repo='{repo}'...")
-                result = await client_deepwiki.call_tool(tool_name, arguments={"repository": repo})
+                result = await retry_call_tool(client_deepwiki, tool_name, arguments={"repository": repo})
                 print(f"  - Result from tool: '{result}'")
                 
                 tool_name = "read_wiki_contents"
                 print(f"\n▶️ Calling tool '{tool_name}' with parameter repo='{repo}'...")
-                result = await client_deepwiki.call_tool(tool_name, arguments={"repository": repo})
+                result = await retry_call_tool(client_deepwiki, tool_name, arguments={"repository": repo})
                 print(f"  - Result from tool: '{result}'")
 
                 tool_name = "ask_question"
                 question = "how to contribute?"
                 print(f"\n▶️ Calling tool '{tool_name}' with parameter repo='{repo}' question='{question}'...")
-                result = await client_deepwiki.call_tool(tool_name, arguments={"repository": repo, "question": question})
+                result = await retry_call_tool(client_deepwiki, tool_name, arguments={"repository": repo, "question": question})
                 print(f"  - Result from tool: '{result}'")
 
     except Exception as e:
