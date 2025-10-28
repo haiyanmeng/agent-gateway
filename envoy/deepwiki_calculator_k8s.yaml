@@ -30,6 +30,28 @@ static_resources:
                     # The host header will be rewritten to the upstream's hostname
                     host_rewrite_literal: mcp.deepwiki.com
             http_filters:
+            - name: envoy.filters.http.jwt_authn
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+                # Define the token issuers (providers)
+                providers:
+                  kubernetes_provider:
+                    # This MUST match the 'iss' claim in the Kubernetes service account JWT
+                    issuer: https://container.googleapis.com/v1/projects/haiyanmeng-gke-dev/locations/us-central1/clusters/cluster-1
+                    local_jwks:
+                      filename: /etc/envoy/jwks/gke.json # Path on the shared volume
+                    from_headers:
+                    - name: x-k8s-sa-token
+                    claim_to_headers:
+                    - claim_name: sub # example: system:serviceaccount:default:sa1
+                      header_name: x-user-role
+                # Define rules for applying the filter
+                rules:
+                  # This rule applies the JWT check to all incoming requests
+                  - match: { prefix: "/" }
+                    requires:
+                      # Specifies which provider to use for this rule
+                      provider_name: kubernetes_provider
             - name: envoy.filters.http.mcp
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
@@ -71,7 +93,7 @@ static_resources:
                               - header:
                                   name: "x-user-role"
                                   string_match:
-                                    exact: "default/sa1"
+                                    exact: "system:serviceaccount:default:sa1"
                       permissions:
                       - and_rules:
                           rules:
@@ -108,7 +130,7 @@ static_resources:
                               - header:
                                   name: "x-user-role"
                                   string_match:
-                                    exact: "default/sa2"
+                                    exact: "system:serviceaccount:default:sa2"
                       permissions:
                       - and_rules:
                           rules:
@@ -141,7 +163,7 @@ static_resources:
                               - header:
                                   name: "x-user-role"
                                   string_match:
-                                    exact: "default/sa2"
+                                    exact: "system:serviceaccount:default:sa2"
                       permissions:
                       - and_rules:
                           rules:
@@ -194,6 +216,30 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: mcp.deepwiki.com # Server Name Indication is required for TLS handshake
+  # - name: kubernetes_api_cluster
+  #   type: STRICT_DNS
+  #   connect_timeout: 1s
+  #   load_assignment:
+  #     cluster_name: kubernetes_api_cluster
+  #     endpoints:
+  #     - lb_endpoints:
+  #       - endpoint:
+  #           address:
+  #             socket_address:
+  #               # This is the internal DNS name for the K8s API server
+  #               address: kubernetes.default.svc
+  #               port_value: 443
+  #   # This part is crucial for secure TLS communication
+  #   transport_socket:
+  #     name: envoy.transport_sockets.tls
+  #     typed_config:
+  #       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+  #       common_tls_context:
+  #         validation_context:
+  #           # Trust the CA that signed the API server's certificate
+  #           trusted_ca:
+  #             # This CA certificate is automatically mounted into every pod
+  #             filename: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
 admin:
   address:

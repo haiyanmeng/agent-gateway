@@ -40,8 +40,7 @@ async def main():
     transport = StreamableHttpTransport(
         url=server_url,
         headers={
-        "x-k8s-sa-token": token,
-        "x-user-role": "default/sa1",
+            "x-k8s-sa-token": token,
         }
     )
     client = Client(transport)

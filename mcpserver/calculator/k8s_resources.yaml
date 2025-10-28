@@ -17,6 +17,7 @@ spec:
         image: docker.io/hmeng/calculator:latest
         ports:
         - containerPort: 9000
+      serviceAccountName: calculator-sa
 ---
 apiVersion: v1
 kind: Service
@@ -30,3 +31,8 @@ spec:
       port: 9000
       targetPort: 9000
   type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: calculator-sa

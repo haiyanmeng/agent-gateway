@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: mcp-agent
-        image: docker.io/hmeng/agent:v5
+        image: docker.io/hmeng/agent:v6
         imagePullPolicy: Always
         env:
         - name: MCP_SERVER_URL
@@ -31,3 +31,8 @@ spec:
             memory: "64Mi"
             cpu: "250m"
       serviceAccountName: sa1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa1

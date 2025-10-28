@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metadata-server-egress
+  namespace: default # Make sure this is the correct namespace
+spec:
+  # Apply this policy to your Envoy pods
+  podSelector:
+    matchLabels:
+      app: envoy # ❗ This MUST match the label on your pods
+  policyTypes:
+  - Egress
+  egress:
+  # Allow TCP traffic to the GKE Metadata Server
+  - to:
+    - ipBlock:
+        cidr: 169.254.169.254/32
+    ports:
+    - protocol: TCP
+      port: 80
+  # ❗ Rule 2: Allow all outbound traffic on port 443 (HTTPS)
+  - ports:
+    - protocol: TCP
+      port: 443

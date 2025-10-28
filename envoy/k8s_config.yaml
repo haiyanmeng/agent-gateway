@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: envoy
-        image: envoyproxy/envoy:v1.36-latest
+        image: envoyproxy/envoy:contrib-v1.36-latest
         imagePullPolicy: Always
         command: ["/usr/local/bin/envoy"]
         args: ["-c", "/etc/envoy/envoy.yaml", "-l", "trace", "--log-path", "/dev/stderr"]
@@ -25,10 +25,39 @@ spec:
         - name: envoy-config-volume
           mountPath: /etc/envoy/envoy.yaml
           subPath: deepwiki_calculator_k8s.yaml
+        - name: jwks-volume
+          mountPath: /etc/envoy/jwks # Mount the shared volume where Envoy can read the keys
+      # 2. Add the new sidecar container
+      - name: jwks-fetcher-sidecar
+        image: google/cloud-sdk:slim # A small image with gcloud and curl
+        # This command runs in a loop to fetch the keys every hour
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -e
+          apt-get update && apt-get install -y jq
+          echo "Starting JWKS fetcher..."
+          touch /var/run/jwks/gke.json
+
+          while true; do
+            echo "Fetching GKE JWKS keys..."
+            JWKS_URI="https://container.googleapis.com/v1/projects/haiyanmeng-gke-dev/locations/us-central1/clusters/cluster-1/jwks"
+            curl -v "$JWKS_URI" -o /var/run/jwks/gke.json.tmp
+            # Atomically move the file to prevent Envoy from reading a partial write
+            mv /var/run/jwks/gke.json.tmp /var/run/jwks/gke.json
+            echo "JWKS keys updated successfully."
+            sleep 3600 # Sleep for 1 hour
+          done
+        volumeMounts:
+        - name: jwks-volume
+          mountPath: /var/run/jwks # Mount the shared volume where the sidecar writes the keys
       volumes:
       - name: envoy-config-volume
         configMap:
           name: envoy-config
+      - name: jwks-volume
+        emptyDir: {} # A temporary volume shared by containers in this pod
+      serviceAccountName: envoy-sa
 ---
 apiVersion: v1
 kind: Service
@@ -42,3 +71,10 @@ spec:
   - protocol: TCP
     port: 10001 # Port for the service itself
     targetPort: 10001 # Port on the Envoy pod
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    iam.gke.io/gcp-service-account: envoy-gsa@haiyanmeng-gke-dev.iam.gserviceaccount.com
+  name: envoy-sa
