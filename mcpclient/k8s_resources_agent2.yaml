@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: mcp-agent
-        image: docker.io/hmeng/agent:v16
+        image: docker.io/hmeng/agent:v20
         imagePullPolicy: Always
         env:
         - name: MCP_SERVER_URL

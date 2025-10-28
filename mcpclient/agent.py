@@ -27,18 +27,26 @@ def get_sa_token():
         print(f"An error occurred while reading the token: {e}")
         return None
     
-async def call_tool_with_timeout(client, tool_name, arguments, timeout=5.0):
+async def call_tool_safely(transport, tool_name, arguments, timeout=5.0):
+    """
+    Creates a short-lived client to make a single, isolated tool call
+    with a timeout. This prevents a timeout from corrupting the client state.
+    """
     try:
-        # Wrap the call with a timeout
-        result = await asyncio.wait_for(
-            client.call_tool(tool_name, arguments=arguments),
-            timeout=timeout
-        )
-        print(f"DEBUG: Tool call result: {result}")
-        return result
+        async with Client(transport) as client:
+            result = await asyncio.wait_for(
+                client.call_tool(tool_name, arguments=arguments),
+                timeout=timeout
+            )
+            print(f"DEBUG: Tool call result: {result}")
+            return result
     except asyncio.TimeoutError:
         print(f"⌛️ Tool call to '{tool_name}' timed out after {timeout} seconds.")
+        # We raise an exception here to be caught by the per-call try/except blocks
         raise Exception(f"Tool call to '{tool_name}' timed out.")
+    except Exception as e:
+        # Re-raise any other exceptions (like 403s) to be caught by the caller
+        raise e
 
 async def main():
     """
@@ -47,7 +55,7 @@ async def main():
     token = get_sa_token()
     if not token:
         print(f"Could not obtain a service account token. Exiting.")
-    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...  v16\n")
+    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...  v20\n")
 
     # With custom headers for authentication
     transport_calculator = StreamableHttpTransport(
@@ -56,29 +64,14 @@ async def main():
             "x-k8s-sa-token": token,
         }
     )
-    client_calculator = Client(transport_calculator)
     print(f"🤖 Agent starting up and connecting to {server_url_calculator}...\n")
 
     try:
-        async with client_calculator:
-            print(f"✅ Connection successful!\n")
-
-            # # 2. Discover available resources
-            # print("\n🔍 Discovering resources...")
-            # resources = await client.list_resources()
-            # for res in resources:
-            #     print(f"  - Found resource: '{res.name}' ({res.uri})")
-
-            # # 3. Read the content of the first resource found
-            # if resources:
-            #     resource_uri = resources[0].uri
-            #     print(f"\n📖 Reading content from '{resource_uri}'...")
-            #     content = await client.read_resource(resource_uri)
-            #     print(f"  - Content: '{content}'")
-
-            # 4. Discover available tools
+        # Discover available tools using a temporary client
+        async with Client(transport_calculator) as temp_client:
+            print(f"✅ Connection successful!")
             print(f"🛠️ Discovering tools...")
-            tools = await client_calculator.list_tools()
+            tools = await temp_client.list_tools()
             for tool in tools:
                 print(f"  - Found tool: '{tool.name}' - {tool.description}")
 
@@ -88,7 +81,7 @@ async def main():
                 try:
                     tool_name = "add"
                     print(f"\n▶️ Calling tool '{tool_name}' with parameters 'a=9, b=3'...")
-                    result = await call_tool_with_timeout(client_calculator, tool_name, arguments={"a": 9, "b": 3})
+                    result = await call_tool_safely(transport_calculator, tool_name, arguments={"a": 9, "b": 3})
                     print(f"  - Result from tool: '{result}'")
                 except Exception as e:
                     print(f"    - ❌ Error calling tool '{tool_name}': {e}")
@@ -97,7 +90,7 @@ async def main():
                 try:
                     tool_name = "subtract"
                     print(f"\n▶️ Calling tool '{tool_name}' with parameters 'a=8, b=3'...")
-                    result = await call_tool_with_timeout(client_calculator, tool_name, arguments={"a": 8, "b": 3})
+                    result = await call_tool_safely(transport_calculator, tool_name, arguments={"a": 8, "b": 3})
                     print(f"  - Result from tool: '{result}'")
                 except Exception as e:
                     print(f"    - ❌ Error calling tool '{tool_name}': {e}")
@@ -113,50 +106,49 @@ async def main():
             "x-k8s-sa-token": token,
         }
     )
-    client_deepwiki = Client(transport_deepwiki)
+    # We no longer need a long-lived client for deepwiki
     print(f"🤖 Agent starting up and connecting to {server_url_deepwiki}...\n")
 
     try:
-        async with client_deepwiki:
+        # Discover available tools using a temporary client
+        async with Client(transport_deepwiki) as temp_client:
             print(f"✅ Connection successful!")
-
-            # Discover available tools
             print(f"\n🛠️ Discovering tools...")
-            tools = await client_deepwiki.list_tools()
+            tools = await temp_client.list_tools()
             for tool in tools:
                 print(f"  - Found tool: '{tool.name}' - {tool.description}")
 
-            # Call a specific tool with parameters
-            if tools:
-                repo = "kubernetes/kubernetes"
-                
-                # --- Call read_wiki_structure ---
-                try:
-                    tool_name = "read_wiki_structure"
-                    print(f"\n▶️ Calling tool '{tool_name}' with parameter repoName='{repo}'...")
-                    result = await call_tool_with_timeout(client_deepwiki, tool_name, arguments={"repoName": repo})
-                    print(f"  - Result from tool: '{result}'")
-                except Exception as e:
-                    print(f"    - ❌ Error calling tool '{tool_name}': {e}")
+        # Call a specific tool with parameters
+        if tools:
+            repo = "kubernetes/kubernetes"
+            
+            # --- Call read_wiki_structure ---
+            try:
+                tool_name = "read_wiki_structure"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameter repoName='{repo}'...")
+                result = await call_tool_safely(transport_deepwiki, tool_name, arguments={"repoName": repo})
+                print(f"  - Result from tool: '{result}'")
+            except Exception as e:
+                print(f"    - ❌ Error calling tool '{tool_name}': {e}")
 
-                # --- Call read_wiki_contents ---
-                try:
-                    tool_name = "read_wiki_contents"
-                    print(f"\n▶️ Calling tool '{tool_name}' with parameter repoName='{repo}'...")
-                    result = await call_tool_with_timeout(client_deepwiki, tool_name, arguments={"repoName": repo})
-                    print(f"  - Result from tool: '{result}'")
-                except Exception as e:
-                    print(f"    - ❌ Error calling tool '{tool_name}': {e}")
+            # --- Call read_wiki_contents ---
+            try:
+                tool_name = "read_wiki_contents"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameter repoName='{repo}'...")
+                result = await call_tool_safely(transport_deepwiki, tool_name, arguments={"repoName": repo})
+                print(f"  - Result from tool: '{result}'")
+            except Exception as e:
+                print(f"    - ❌ Error calling tool '{tool_name}': {e}")
 
-                # --- Call ask_question ---
-                try:
-                    tool_name = "ask_question"
-                    question = "how to contribute?"
-                    print(f"\n▶️ Calling tool '{tool_name}' with parameter repoName='{repo}' question='{question}'...")
-                    result = await call_tool_with_timeout(client_deepwiki, tool_name, arguments={"repoName": repo, "question": question})
-                    print(f"  - Result from tool: '{result}'")
-                except Exception as e:
-                    print(f"    - ❌ Error calling tool '{tool_name}': {e}")
+            # --- Call ask_question ---
+            try:
+                tool_name = "ask_question"
+                question = "how to contribute?"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameter repoName='{repo}' question='{question}'...")
+                result = await call_tool_safely(transport_deepwiki, tool_name, arguments={"repoName": repo, "question": question})
+                print(f"  - Result from tool: '{result}'")
+            except Exception as e:
+                print(f"    - ❌ Error calling tool '{tool_name}': {e}")
 
     except Exception as e:
         print(f"❌ An error occurred during the deepwiki client session: {e}")
