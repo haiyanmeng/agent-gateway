@@ -49,13 +49,13 @@ spec:
   rules:
   - source:
       serviceAccounts:
-      - "default/sa1"
+      - "system:serviceaccount:default:sa1"
     tools:
     - "add"
     - "subtract"
   - source:
       serviceAccounts:
-      - "default/sa2"
+      - "system:serviceaccount:default:sa2"
     tools:
     - "subtract"
 ---
@@ -71,7 +71,7 @@ spec:
   rules:
   - source:
       serviceAccounts:
-      - "default/sa2"
+      - "system:serviceaccount:default:sa2"
     tools:
     - "read_wiki_structure"
 ---
