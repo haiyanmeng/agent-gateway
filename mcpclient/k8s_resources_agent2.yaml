@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mcp-agent-deployment
+  name: agent2
   labels:
-    app: mcp-agent
+    app: agent2
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mcp-agent
+      app: agent2
   template:
     metadata:
       labels:
-        app: mcp-agent
+        app: agent2
     spec:
       containers:
       - name: mcp-agent
-        image: docker.io/hmeng/agent:v6
+        image: docker.io/hmeng/agent:latest
         imagePullPolicy: Always
         env:
         - name: MCP_SERVER_URL
-          value: "http://envoy-service:10001/mcp-server1/mcp"
+          value: "http://envoy-service:10001"
         command: ["/bin/sh", "-c", "python agent.py && sleep infinity"]
         # Add resource limits and requests as appropriate for your environment
         resources:
@@ -30,9 +30,9 @@ spec:
           requests:
             memory: "64Mi"
             cpu: "250m"
-      serviceAccountName: sa1
+      serviceAccountName: sa2
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: sa1
+  name: sa2

@@ -1,0 +1,2 @@
+docker build --no-cache -t hmeng/agent:v7 .
+docker push docker.io/hmeng/agent:v7

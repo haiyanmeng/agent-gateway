@@ -4,7 +4,11 @@ import os
 from fastmcp.client import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
-server_url = os.environ.get("MCP_SERVER_URL", "http://envoy-service:10001/mcp-server1/mcp")
+server_url = os.environ.get("MCP_SERVER_URL", "http://envoy-service:10001")
+
+server_url_calculator = server_url + "/mcp-server1/mcp"
+
+server_url_deepwiki = server_url + "/mcp-server2/mcp"
 
 # The standard path where the service account token is mounted.
 TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
@@ -16,7 +20,7 @@ def get_sa_token():
             return f.read().strip()
     except FileNotFoundError:
         print(f"Service account token file not found at {TOKEN_PATH}.")
-        print("This script is likely not running inside a Kubernetes pod.")
+        print(f"This script is likely not running inside a Kubernetes pod.")
         return None
     except Exception as e:
         print(f"An error occurred while reading the token: {e}")
@@ -26,28 +30,37 @@ async def main():
     """
     An example AI agent that connects to and interacts with an MCP server.
     """
-    print(f"🤖 Agent starting up and connecting to {server_url}...")
-
     token = get_sa_token()
     if not token:
-        print("Could not obtain a service account token. Exiting.")
+        print(f"Could not obtain a service account token. Exiting.")
         return
 
     # For security, only print a portion of the token in logs.
-    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...")
+    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...\n")
 
     # With custom headers for authentication
-    transport = StreamableHttpTransport(
-        url=server_url,
+    transport_calculator = StreamableHttpTransport(
+        url=server_url_calculator,
         headers={
             "x-k8s-sa-token": token,
         }
     )
-    client = Client(transport)
+    client_calculator = Client(transport_calculator)
+    print(f"🤖 Agent starting up and connecting to {server_url_calculator}...\n")
+
+
+    transport_deepwiki = StreamableHttpTransport(
+        url=server_url_deepwiki,
+        headers={
+            "x-k8s-sa-token": token,
+        }
+    )
+    client_deepwiki = Client(transport_deepwiki)
+    print(f"🤖 Agent starting up and connecting to {server_url_deepwiki}...\n")
 
     try:
-        async with client:
-            print("✅ Connection successful!")
+        async with client_calculator:
+            print(f"✅ Connection successful!\n")
 
             # # 2. Discover available resources
             # print("\n🔍 Discovering resources...")
@@ -63,22 +76,61 @@ async def main():
             #     print(f"  - Content: '{content}'")
 
             # 4. Discover available tools
-            print("\n🛠️ Discovering tools...")
-            tools = await client.list_tools()
+            print(f"🛠️ Discovering tools...")
+            tools = await client_calculator.list_tools()
             for tool in tools:
                 print(f"  - Found tool: '{tool.name}' - {tool.description}")
 
             # 5. Call a specific tool with parameters
             if tools:
-                            tool_name = "add"
-                            print(f"\n▶️ Calling tool '{tool_name}' with parameters 'a=5, b=3'...")
-                            result = await client.call_tool(tool_name, arguments={"a": 5, "b": 3})
-            print(f"  - Result from tool: '{result}'")
+                tool_name = "add"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameters 'a=9, b=3'...")
+                result = await client_calculator.call_tool(tool_name, arguments={"a": 9, "b": 3})
+                print(f"  - Result from tool: '{result}'")
+
+                tool_name = "subtract"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameters 'a=8, b=3'...")
+                result = await client_calculator.call_tool(tool_name, arguments={"a": 8, "b": 3})
+                print(f"  - Result from tool: '{result}'")
 
     except Exception as e:
         print(f"❌ An error occurred: {e}")
     finally:
-        print("\n🔌 Connection closed. Agent shutting down.")
+        print(f"\n🔌 Connection closed. Agent shutting down.\n\n")
+    
+    try:
+        async with client_deepwiki:
+            print(f"✅ Connection successful!")
+
+            # Discover available tools
+            print(f"\n🛠️ Discovering tools...")
+            tools = await client_deepwiki.list_tools()
+            for tool in tools:
+                print(f"  - Found tool: '{tool.name}' - {tool.description}")
+
+            # Call a specific tool with parameters
+            if tools:
+                tool_name = "read_wiki_structure"
+                repo = "kubernetes/kubernetes"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameter repo='{repo}'...")
+                result = await client_deepwiki.call_tool(tool_name, arguments={"repository": repo})
+                print(f"  - Result from tool: '{result}'")
+                
+                tool_name = "read_wiki_contents"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameter repo='{repo}'...")
+                result = await client_deepwiki.call_tool(tool_name, arguments={"repository": repo})
+                print(f"  - Result from tool: '{result}'")
+
+                tool_name = "ask_question"
+                question = "how to contribute?"
+                print(f"\n▶️ Calling tool '{tool_name}' with parameter repo='{repo}' question='{question}'...")
+                result = await client_deepwiki.call_tool(tool_name, arguments={"repository": repo, "question": question})
+                print(f"  - Result from tool: '{result}'")
+
+    except Exception as e:
+        print(f"❌ An error occurred: {e}")
+    finally:
+        print(f"\n🔌 Connection closed. Agent shutting down.")
 
 if __name__ == "__main__":
     asyncio.run(main())
