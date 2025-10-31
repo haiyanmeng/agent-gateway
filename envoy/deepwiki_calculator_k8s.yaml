@@ -24,7 +24,110 @@ static_resources:
                       clusters:
                         - name: mcp-server1
                           weight: 100
-                      total_weight: 100
+                          typed_per_filter_config:
+                            envoy.filters.http.rbac:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+                              rbac:
+                                rules:
+                                  action: ALLOW
+                                  policies:
+                                    "allow-mcp-session-close":
+                                      principals:
+                                        # Both of the following conditions must be true for the request to match
+                                        - and_ids:
+                                            ids:
+                                              # Condition 1: The HTTP method must be DELETE
+                                              - header:
+                                                  name: ":method"
+                                                  string_match:
+                                                    exact: "DELETE"
+                                              # Condition 2: The 'mcp-session-id' header must exist
+                                              - header:
+                                                  name: "mcp-session-id"
+                                                  present_match: true
+                                      permissions:
+                                        # If the principal (the request's identity) matches, allow it
+                                        - any: true
+                                    "allow-anyone-to-initialize-and-list-tool":
+                                      principals:
+                                      - any: true
+                                      permissions:
+                                      - and_rules:
+                                          rules:
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "method"
+                                                value:
+                                                  or_match:
+                                                    value_matchers:
+                                                    - string_match:
+                                                        exact: "initialize"
+                                                    - string_match:
+                                                        exact: "notifications/initialized"
+                                                    - string_match:
+                                                        exact: "tools/list"
+                                    "rule-0":
+                                      principals:
+                                      - or_ids:
+                                          ids:
+                                          - header:
+                                              name: "x-user-role"
+                                              string_match:
+                                                exact: "system:serviceaccount:default:sa1"
+                                      permissions:
+                                      - and_rules:
+                                          rules:
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "method"
+                                                value:
+                                                  string_match:
+                                                    exact: "tools/call"
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "params"
+                                                  - key: "name"
+                                                value:
+                                                  or_match:
+                                                    value_matchers:
+                                                    - string_match:
+                                                        exact: "add"
+                                                    - string_match:
+                                                        exact: "subtract"
+                                    "rule-1":
+                                      principals:
+                                      - or_ids:
+                                          ids:
+                                          - header:
+                                              name: "x-user-role"
+                                              string_match:
+                                                exact: "system:serviceaccount:default:sa2"
+                                      permissions:
+                                      - and_rules:
+                                          rules:
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "method"
+                                                value:
+                                                  string_match:
+                                                    exact: "tools/call"
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "params"
+                                                  - key: "name"
+                                                value:
+                                                  string_match:
+                                                    exact: "subtract"
                     prefix_rewrite: "/mcp"
                 - match:
                     path: "/mcp-server2/mcp"
@@ -33,7 +136,78 @@ static_resources:
                       clusters:
                         - name: mcp-server2
                           weight: 100
-                      total_weight: 100
+                          typed_per_filter_config:
+                            envoy.filters.http.rbac:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+                              rbac:
+                                rules:
+                                  action: ALLOW
+                                  policies:
+                                    "allow-mcp-session-close":
+                                      principals:
+                                        # Both of the following conditions must be true for the request to match
+                                        - and_ids:
+                                            ids:
+                                              # Condition 1: The HTTP method must be DELETE
+                                              - header:
+                                                  name: ":method"
+                                                  string_match:
+                                                    exact: "DELETE"
+                                              # Condition 2: The 'mcp-session-id' header must exist
+                                              - header:
+                                                  name: "mcp-session-id"
+                                                  present_match: true
+                                      permissions:
+                                        # If the principal (the request's identity) matches, allow it
+                                        - any: true
+                                    "allow-anyone-to-initialize-and-list-tool":
+                                      principals:
+                                      - any: true
+                                      permissions:
+                                      - and_rules:
+                                          rules:
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "method"
+                                                value:
+                                                  or_match:
+                                                    value_matchers:
+                                                    - string_match:
+                                                        exact: "initialize"
+                                                    - string_match:
+                                                        exact: "notifications/initialized"
+                                                    - string_match:
+                                                        exact: "tools/list"
+                                    "rule-0":
+                                      principals:
+                                      - or_ids:
+                                          ids:
+                                          - header:
+                                              name: "x-user-role"
+                                              string_match:
+                                                exact: "system:serviceaccount:default:sa2"
+                                      permissions:
+                                      - and_rules:
+                                          rules:
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "method"
+                                                value:
+                                                  string_match:
+                                                    exact: "tools/call"
+                                          - sourced_metadata:
+                                              metadata_matcher:
+                                                filter: "mcp_proxy"
+                                                path:
+                                                  - key: "params"
+                                                  - key: "name"
+                                                value:
+                                                  string_match:
+                                                    exact: "read_wiki_structure"
                     prefix_rewrite: "/mcp"
                     # The host header will be rewritten to the upstream's hostname
                     host_rewrite_literal: mcp.deepwiki.com
@@ -66,149 +240,6 @@ static_resources:
             - name: envoy.filters.http.rbac
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-                rules:
-                  action: ALLOW
-                  policies:
-                    "allow-mcp-session-close":
-                          principals:
-                            # Both of the following conditions must be true for the request to match
-                            - and_ids:
-                                ids:
-                                  # Condition 1: The HTTP method must be DELETE
-                                  - header:
-                                      name: ":method"
-                                      string_match:
-                                        exact: "DELETE"
-                                  # Condition 2: The 'mcp-session-id' header must exist
-                                  - header:
-                                      name: "mcp-session-id"
-                                      present_match: true
-                          permissions:
-                            # If the principal (the request's identity) matches, allow it
-                            - any: true
-                    "allow-anyone-to-initialize-and-list-tool":
-                      principals:
-                      - any: true
-                      permissions:
-                      - and_rules:
-                          rules:
-                          - sourced_metadata:
-                              metadata_matcher: 
-                                filter: "mcp_proxy"
-                                path:
-                                  - key: "method"
-                                value:
-                                  or_match:
-                                    value_matchers:
-                                    - string_match:
-                                        exact: "initialize"
-                                    - string_match:
-                                        exact: "notifications/initialized"
-                                    - string_match:
-                                        exact: "tools/list"
-                    "mcp-server1-rule-0":
-                      principals:
-                      - and_ids:
-                          ids:
-                          - url_path:
-                              path:
-                                prefix: "/mcp-server1/mcp"
-                          - or_ids:
-                              ids:
-                              - header:
-                                  name: "x-user-role"
-                                  string_match:
-                                    exact: "system:serviceaccount:default:sa1"
-                      permissions:
-                      - and_rules:
-                          rules:
-                          - sourced_metadata:
-                              metadata_matcher: 
-                                filter: "mcp_proxy"
-                                path:
-                                  - key: "method"
-                                value:
-                                  string_match:
-                                    exact: "tools/call"
-                          - sourced_metadata:
-                              metadata_matcher:
-                                filter: "mcp_proxy"
-                                path: 
-                                  - key: "params"
-                                  - key: "name"
-                                value:
-                                  or_match:
-                                    value_matchers:
-                                    - string_match:
-                                        exact: "add"
-                                    - string_match:
-                                        exact: "subtract"
-                    "mcp-server1-rule-1":
-                      principals:
-                      - and_ids:
-                          ids:
-                          - url_path:
-                              path:
-                                prefix: "/mcp-server1/mcp"
-                          - or_ids:
-                              ids:
-                              - header:
-                                  name: "x-user-role"
-                                  string_match:
-                                    exact: "system:serviceaccount:default:sa2"
-                      permissions:
-                      - and_rules:
-                          rules:
-                          - sourced_metadata:
-                              metadata_matcher: 
-                                filter: "mcp_proxy"
-                                path:
-                                  - key: "method"
-                                value:
-                                  string_match:
-                                    exact: "tools/call"
-                          - sourced_metadata:
-                              metadata_matcher:
-                                filter: "mcp_proxy"
-                                path: 
-                                  - key: "params"
-                                  - key: "name"
-                                value:
-                                  string_match:
-                                    exact: "subtract"
-                    "mcp-server2-rule-0":
-                      principals:
-                      - and_ids:
-                          ids:
-                          - url_path:
-                              path:
-                                prefix: "/mcp-server2/mcp"
-                          - or_ids:
-                              ids:
-                              - header:
-                                  name: "x-user-role"
-                                  string_match:
-                                    exact: "system:serviceaccount:default:sa2"
-                      permissions:
-                      - and_rules:
-                          rules:
-                          - sourced_metadata:
-                              metadata_matcher: 
-                                filter: "mcp_proxy"
-                                path:
-                                  - key: "method"
-                                value:
-                                  string_match:
-                                    exact: "tools/call"
-                          - sourced_metadata:
-                              metadata_matcher:
-                                filter: "mcp_proxy"
-                                path: 
-                                  - key: "params"
-                                  - key: "name"
-                                value:
-                                  string_match:
-                                    exact: "read_wiki_structure"
             - name: envoy.filters.http.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -241,30 +272,6 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: mcp.deepwiki.com # Server Name Indication is required for TLS handshake
-  # - name: kubernetes_api_cluster
-  #   type: STRICT_DNS
-  #   connect_timeout: 1s
-  #   load_assignment:
-  #     cluster_name: kubernetes_api_cluster
-  #     endpoints:
-  #     - lb_endpoints:
-  #       - endpoint:
-  #           address:
-  #             socket_address:
-  #               # This is the internal DNS name for the K8s API server
-  #               address: kubernetes.default.svc
-  #               port_value: 443
-  #   # This part is crucial for secure TLS communication
-  #   transport_socket:
-  #     name: envoy.transport_sockets.tls
-  #     typed_config:
-  #       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-  #       common_tls_context:
-  #         validation_context:
-  #           # Trust the CA that signed the API server's certificate
-  #           trusted_ca:
-  #             # This CA certificate is automatically mounted into every pod
-  #             filename: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
 admin:
   address:
