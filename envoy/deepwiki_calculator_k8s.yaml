@@ -48,7 +48,7 @@ static_resources:
                                       permissions:
                                         # If the principal (the request's identity) matches, allow it
                                         - any: true
-                                    "allow-anyone-to-initialize-and-list-tool":
+                                    "allow-initialize-and-list-tool":
                                       principals:
                                       - any: true
                                       permissions:
@@ -160,7 +160,7 @@ static_resources:
                                       permissions:
                                         # If the principal (the request's identity) matches, allow it
                                         - any: true
-                                    "allow-anyone-to-initialize-and-list-tool":
+                                    "allow-initialize-and-list-tool":
                                       principals:
                                       - any: true
                                       permissions:
