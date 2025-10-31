@@ -39,12 +39,32 @@ spec:
           echo "Starting JWKS fetcher..."
           touch /var/run/jwks/gke.json
 
+          SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          CACERT_PATH="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
           while true; do
-            echo "Fetching GKE JWKS keys..."
-            JWKS_URI="https://container.googleapis.com/v1/projects/haiyanmeng-gke-dev/locations/us-central1/clusters/cluster-1/jwks"
-            curl -v "$JWKS_URI" -o /var/run/jwks/gke.json.tmp
+            echo "Fetching JWKS keys..."
+            JWKS_URI=$(curl --silent --cacert "$CACERT_PATH" \
+                -H "Authorization: Bearer $SA_TOKEN" \
+                https://kubernetes.default.svc/.well-known/openid-configuration | jq -r '.jwks_uri')
+
+            # Check if the JWKS_URI was found
+            if [ -z "$JWKS_URI" ]; then
+                echo "Could not retrieve JWKS URI. Exiting."
+                exit 1
+            fi
+
+            echo "Discovered JWKS URI: $JWKS_URI"
+
+            # 2. Access the JWKS URI, providing the SAME certificate and token
+            #    This is the corrected command.
+            curl --cacert "$CACERT_PATH" \
+                -H "Authorization: Bearer $SA_TOKEN" \
+                "$JWKS_URI" -o /var/run/jwks/gke.json.tmp
+
             # Atomically move the file to prevent Envoy from reading a partial write
             mv /var/run/jwks/gke.json.tmp /var/run/jwks/gke.json
+            cat /var/run/jwks/gke.json
             echo "JWKS keys updated successfully."
             sleep 3600 # Sleep for 1 hour
           done
@@ -75,6 +95,6 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  annotations:
-    iam.gke.io/gcp-service-account: envoy-gsa@haiyanmeng-gke-dev.iam.gserviceaccount.com
+  # annotations:
+  #   iam.gke.io/gcp-service-account: envoy-gsa@haiyanmeng-gke-dev.iam.gserviceaccount.com
   name: envoy-sa
