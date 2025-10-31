@@ -20,12 +20,20 @@ static_resources:
                 - match:
                     path: "/mcp-server1/mcp"
                   route:
-                    cluster: mcp-server1
+                    weighted_clusters:
+                      clusters:
+                        - name: mcp-server1
+                          weight: 100
+                      total_weight: 100
                     prefix_rewrite: "/mcp"
                 - match:
                     path: "/mcp-server2/mcp"
                   route:
-                    cluster: mcp-server2
+                    weighted_clusters:
+                      clusters:
+                        - name: mcp-server2
+                          weight: 100
+                      total_weight: 100
                     prefix_rewrite: "/mcp"
                     # The host header will be rewritten to the upstream's hostname
                     host_rewrite_literal: mcp.deepwiki.com
