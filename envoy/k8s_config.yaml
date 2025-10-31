@@ -37,7 +37,7 @@ spec:
           set -e
           apt-get update && apt-get install -y jq
           echo "Starting JWKS fetcher..."
-          touch /var/run/jwks/gke.json
+          touch /var/run/jwks/jwks.json
 
           SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
           CACERT_PATH="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
@@ -60,12 +60,12 @@ spec:
             #    This is the corrected command.
             curl --cacert "$CACERT_PATH" \
                 -H "Authorization: Bearer $SA_TOKEN" \
-                "$JWKS_URI" -o /var/run/jwks/gke.json.tmp
+                "$JWKS_URI" -o /var/run/jwks/jwks.json.tmp
 
             # Atomically move the file to prevent Envoy from reading a partial write
-            mv /var/run/jwks/gke.json.tmp /var/run/jwks/gke.json
-            cat /var/run/jwks/gke.json
-            echo "JWKS keys updated successfully."
+            mv /var/run/jwks/jwks.json.tmp /var/run/jwks/jwks.json
+            cat /var/run/jwks/jwks.json
+            echo -e "\nJWKS keys updated successfully."
             sleep 3600 # Sleep for 1 hour
           done
         volumeMounts:
@@ -95,6 +95,4 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  # annotations:
-  #   iam.gke.io/gcp-service-account: envoy-gsa@haiyanmeng-gke-dev.iam.gserviceaccount.com
   name: envoy-sa

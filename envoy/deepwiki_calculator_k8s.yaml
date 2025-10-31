@@ -219,9 +219,9 @@ static_resources:
                 providers:
                   kubernetes_provider:
                     # This MUST match the 'iss' claim in the Kubernetes service account JWT
-                    issuer: https://container.googleapis.com/v1/projects/haiyanmeng-gke-dev/locations/us-central1/clusters/cluster-1
+                    issuer: https://kubernetes.default.svc.cluster.local
                     local_jwks:
-                      filename: /etc/envoy/jwks/gke.json # Path on the shared volume
+                      filename: /etc/envoy/jwks/jwks.json # Path on the shared volume
                     from_headers:
                     - name: x-k8s-sa-token
                     claim_to_headers:
