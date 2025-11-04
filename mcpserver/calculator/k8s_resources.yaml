@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mcp-server-calculator
+  namespace: mcp-server-calculator-system
 spec:
   replicas: 1
   selector:
@@ -23,6 +24,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: server1-svc
+  namespace: mcp-server-calculator-system
 spec:
   selector:
     app: mcp-server1
@@ -36,3 +38,4 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: calculator-sa
+  namespace: mcp-server-calculator-system

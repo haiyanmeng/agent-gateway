@@ -1,5 +1,5 @@
-kubectl delete cm envoy-config
-kubectl create configmap envoy-config --from-file=deepwiki_calculator_k8s.yaml
+kubectl delete cm envoy-config -n envoy-gateway-system
+kubectl create configmap envoy-config --from-file=deepwiki_calculator_k8s.yaml -n envoy-gateway-system
 kubectl delete -f k8s_config.yaml
 sleep 10
 kubectl apply -f k8s_config.yaml

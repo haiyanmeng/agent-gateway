@@ -5,7 +5,7 @@ import aiohttp
 from fastmcp.client import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
-server_url = os.environ.get("MCP_SERVER_URL", "http://envoy-service:10001")
+server_url = os.environ.get("MCP_SERVER_URL", "http://envoy-service.envoy-gateway-system.svc.cluster.local:10001")
 
 server_url_calculator = server_url + "/mcp-server1/mcp"
 
@@ -94,7 +94,7 @@ async def main():
     if not token:
         print(f"Could not obtain a service account token. Exiting.")
         return
-    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...  v21\n")
+    print(f"Successfully read the service account token (first 8 chars): {token[:8]}...  v22\n")
 
     calculator_tool_calls = [
         {"name": "add", "args": {"a": 9, "b": 3}, "display_params": "'a=9, b=3'"},

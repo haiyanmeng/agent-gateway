@@ -75,7 +75,7 @@ static_resources:
                                           - header:
                                               name: "x-user-role"
                                               string_match:
-                                                exact: "system:serviceaccount:default:sa1"
+                                                exact: "system:serviceaccount:agent:sa1"
                                       permissions:
                                       - and_rules:
                                           rules:
@@ -107,7 +107,7 @@ static_resources:
                                           - header:
                                               name: "x-user-role"
                                               string_match:
-                                                exact: "system:serviceaccount:default:sa2"
+                                                exact: "system:serviceaccount:agent:sa2"
                                       permissions:
                                       - and_rules:
                                           rules:
@@ -187,7 +187,7 @@ static_resources:
                                           - header:
                                               name: "x-user-role"
                                               string_match:
-                                                exact: "system:serviceaccount:default:sa2"
+                                                exact: "system:serviceaccount:agent:sa2"
                                       permissions:
                                       - and_rules:
                                           rules:
@@ -226,7 +226,7 @@ static_resources:
                     from_headers:
                     - name: x-k8s-sa-token
                     claim_to_headers:
-                    - claim_name: sub # example: system:serviceaccount:default:sa1
+                    - claim_name: sub # example: system:serviceaccount:agent:sa1
                       header_name: x-user-role
                 # Define rules for applying the filter
                 rules:
@@ -255,7 +255,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: server1-svc.default.svc.cluster.local
+                address: server1-svc.mcp-server-calculator-system.svc.cluster.local
                 port_value: 9000
   - name: mcp-server2
     type: LOGICAL_DNS

@@ -1,3 +1,7 @@
+kubectl create namespace envoy-gateway-system
+kubectl create namespace agent
+kubectl create namespace mcp-server-calculator-system
+
 kind create cluster --config=kind-config.yaml
 
 kubectl get --raw /.well-known/openid-configuration
