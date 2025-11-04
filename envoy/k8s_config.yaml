@@ -96,3 +96,26 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: envoy-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jwks-reader
+rules:
+- nonResourceURLs:
+  - "/openid/v1/jwks"
+  verbs:
+  - "get"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: read-jwks-for-envoy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: jwks-reader # <-- Matches the ClusterRole name
+subjects:
+- kind: ServiceAccount
+  name: envoy-sa
+  namespace: default 

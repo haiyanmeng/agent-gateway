@@ -1,0 +1,15 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# This section is the magic
+kubeadmConfigPatches:
+- |
+  apiVersion: kubeadm.k8s.io/v1beta3
+  kind: ClusterConfiguration
+  apiServer:
+    extraArgs:
+      # This tells the API server to identify itself with the
+      # in-cluster service name, which is what Envoy expects.
+      service-account-issuer: https://kubernetes.default.svc.cluster.local
+
+      # It forces the "jwks_uri" to use this base URL.
+      service-account-issuer-base-url: https://kubernetes.default.svc
