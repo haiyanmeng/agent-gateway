@@ -221,8 +221,15 @@ static_resources:
                     # This MUST match the 'iss' claim in the Kubernetes service account JWT
                     issuer: https://kubernetes.default.svc.cluster.local # issuer of a KIND cluster
                     # issuer: https://container.googleapis.com/v1/projects/haiyanmeng-gke-dev/locations/us-central1/clusters/cluster-1 # issuer of a GKE cluster
-                    local_jwks:
-                      filename: /etc/envoy/jwks/jwks.json # Path on the shared volume
+                    remote_jwks:
+                      http_uri:
+                        # This is the standard K8s OIDC JWKS endpoint
+                        uri: https://kubernetes.default.svc/openid/v1/jwks
+                        # This cluster must be defined in your static_resources
+                        cluster: kubernetes_api_cluster
+                        timeout: 5s
+                      # Cache the keys for 1 hour to avoid spamming the API server
+                      cache_duration: 3600s
                     from_headers:
                     - name: x-k8s-sa-token
                     claim_to_headers:
@@ -273,7 +280,29 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: mcp.deepwiki.com # Server Name Indication is required for TLS handshake
-
+  - name: kubernetes_api_cluster
+    type: LOGICAL_DNS
+    # Use port 443 for HTTPS
+    load_assignment:
+      cluster_name: kubernetes_api_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: kubernetes.default.svc
+                port_value: 443
+    # This section is critical for making HTTPS work
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: kubernetes.default.svc
+        common_tls_context:
+          validation_context:
+            # This tells Envoy to trust the K8s API server's cert
+            trusted_ca:
+              filename: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 admin:
   address:
     socket_address:
