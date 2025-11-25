@@ -113,22 +113,12 @@ data:
     # Envoy Rule: ALLOW if ANY of the dynamic metadata method names are present:
     # "initialize", "notifications/initialized", OR "tools/list".
     allow_initialize_and_list_tool if {
-        input.parsed_body.method == "initialize"
-    }
-
-    allow_initialize_and_list_tool if {
-        input.parsed_body.method == "notifications/initialized"
-    }
-
-    allow_initialize_and_list_tool if {
-        input.parsed_body.method == "tools/list"
+        allowlist := {"initialize", "notifications/initialized", "tools/list"}
+        allowlist[input.parsed_body.method]
     }
 
     # --------------------------------------------------------------------------
-    # Policy 3: rule-0 (tools/call: read_wiki_structure)
-    # Envoy Rule: ALLOW if (Header 'x-user-role' == 'system:serviceaccount:agent:sa2') AND
-    # (Metadata method == 'tools/call') AND (Metadata params.name == 'read_wiki_structure').
-
+    # Policy 3: tools/call
     allow_tool_list_sa1 := {"add", "subtract"}
     allow_tool_list_sa2 := {"read_wiki_structure", "subtract"}
     allow_tool_call_sa2 if {
