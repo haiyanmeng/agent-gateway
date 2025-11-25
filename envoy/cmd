@@ -1,23 +1,5 @@
 kubectl delete cm envoy-config -n envoy-gateway-system
-kubectl create configmap envoy-config --from-file=deepwiki_calculator_k8s.yaml -n envoy-gateway-system
-kubectl delete -f k8s_config.yaml
+kubectl create configmap envoy-config --from-file=deepwiki_calculator_k8s_opa.yaml -n envoy-gateway-system
+kubectl delete -f k8s_config_opa.yaml
 sleep 10
-kubectl apply -f k8s_config.yaml
-
-export PROJECT_ID=haiyanmeng-gke-dev
-
-gcloud iam service-accounts create envoy-gsa \
-    --project=${PROJECT_ID} \
-    --display-name="Envoy GSA for JWKS Fetching"
-
-gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-    --role="roles/container.clusterViewer" \
-    --member="serviceAccount:envoy-gsa@${PROJECT_ID}.iam.gserviceaccount.com"
-
-gcloud iam service-accounts add-iam-policy-binding "envoy-gsa@${PROJECT_ID}.iam.gserviceaccount.com" \
-    --role="roles/iam.workloadIdentityUser" \
-    --member="serviceAccount:${PROJECT_ID}.svc.id.goog[default/envoy-sa]"
-
-kubectl annotate serviceaccount envoy-sa \
-    --namespace default \
-    iam.gke.io/gcp-service-account="envoy-gsa@${PROJECT_ID}.iam.gserviceaccount.com"
+kubectl apply -f k8s_config_opa.yaml

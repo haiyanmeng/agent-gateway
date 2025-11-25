@@ -1,0 +1,25 @@
+{
+  "input": {
+    "attributes": {
+      "request": {
+        "http": {
+          "method": "GET",
+          "path": "/mcp-server2/mcp",
+          "headers": {
+            "x-user-role": "system:serviceaccount:agent:sa2"
+          }
+        }
+      },
+      "metadata": {
+        "filter_metadata": {
+          "mcp_proxy": {
+            "method": "tools/call",
+            "params": {
+              "name": "read_wiki_structure"
+            }
+          }
+        }
+      }
+    }
+  }
+}

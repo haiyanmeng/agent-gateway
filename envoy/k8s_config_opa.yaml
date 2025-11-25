@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy-deployment
+  namespace: envoy-gateway-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoy
+  template:
+    metadata:
+      labels:
+        app: envoy
+    spec:
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:contrib-v1.36-latest
+        imagePullPolicy: Always
+        command: ["/usr/local/bin/envoy"]
+        args: ["-c", "/etc/envoy/envoy.yaml", "-l", "trace", "--log-path", "/dev/stderr"]
+        ports:
+        - name: http
+          containerPort: 10001
+        volumeMounts:
+        - name: envoy-config-volume
+          mountPath: /etc/envoy/envoy.yaml
+          subPath: deepwiki_calculator_k8s_opa.yaml
+      - name: opa
+        image: openpolicyagent/opa:latest-envoy
+        args:
+          # Run OPA in server mode
+          - "run"
+          - "--server"
+          - "--log-level=debug"
+          - "--set=plugins.envoy_ext_authz_grpc.addr=:9191"
+          # Load the policy from the mounted file
+          - "/policies/authz.rego"
+        ports:
+        - containerPort: 9191 # OPA API Port
+        volumeMounts:
+        - name: policy-volume
+          mountPath: /policies
+          readOnly: true
+      volumes:
+      - name: envoy-config-volume
+        configMap:
+          name: envoy-config
+      - name: policy-volume
+        configMap:
+          name: opa-policy # Links to the ConfigMap created above
+      serviceAccountName: envoy-sa
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-service
+  namespace: envoy-gateway-system
+spec:
+  type: ClusterIP
+  selector:
+    app: envoy
+  ports:
+  - protocol: TCP
+    port: 10001 # Port for the service itself
+    targetPort: 10001 # Port on the Envoy pod
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: envoy-sa
+  namespace: envoy-gateway-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opa-policy
+  namespace: envoy-gateway-system
+data:
+  authz.rego: |
+    package envoy.authz
+
+    # By default, all requests are denied unless an 'allow' rule matches.
+    default allow = false
+
+    # The primary 'allow' rule is true if any of the three policies defined below are true.
+    allow if {
+      allow_mcp_session_close
+    }
+    allow if {
+      allow_initialize_and_list_tool
+    }
+    allow if {
+      allow_tool_call_sa1
+    }
+    allow if {
+      allow_tool_call_sa2
+    }
+
+    # --------------------------------------------------------------------------
+    # Policy 1: allow-mcp-session-close
+    # Envoy Rule: ALLOW if (Method == DELETE) AND (Header 'mcp-session-id' is Present)
+    allow_mcp_session_close if {
+        # Match Condition 1: HTTP Method must be DELETE
+        input.attributes.request.http.method == "DELETE"
+
+        # Match Condition 2: Header 'mcp-session-id' must be present.
+        input.attributes.request.http.headers["mcp-session-id"]
+    }
+
+    # --------------------------------------------------------------------------
+    # Policy 2: allow-initialize-and-list-tool
+    # Envoy Rule: ALLOW if ANY of the dynamic metadata method names are present:
+    # "initialize", "notifications/initialized", OR "tools/list".
+    allow_initialize_and_list_tool if {
+        input.parsed_body.method == "initialize"
+    }
+
+    allow_initialize_and_list_tool if {
+        input.parsed_body.method == "notifications/initialized"
+    }
+
+    allow_initialize_and_list_tool if {
+        input.parsed_body.method == "tools/list"
+    }
+
+    # --------------------------------------------------------------------------
+    # Policy 3: rule-0 (tools/call: read_wiki_structure)
+    # Envoy Rule: ALLOW if (Header 'x-user-role' == 'system:serviceaccount:agent:sa2') AND
+    # (Metadata method == 'tools/call') AND (Metadata params.name == 'read_wiki_structure').
+
+    allow_tool_list_sa1 := {"add", "subtract"}
+    allow_tool_list_sa2 := {"read_wiki_structure", "subtract"}
+    allow_tool_call_sa2 if {
+        # Principal Match: Header 'x-user-role' must be a service account
+        input.attributes.request.http.headers["x-user-role"] == "system:serviceaccount:agent:sa2"
+
+        # Permission Condition 1: Metadata method must be 'tools/call'
+        input.parsed_body.method == "tools/call"
+
+        tool_name := input.parsed_body.params.name
+        allow_tool_list_sa2[tool_name]
+    }
+
+    allow_tool_call_sa1 if {
+        # Principal Match: Header 'x-user-role' must be a service account
+        input.attributes.request.http.headers["x-user-role"] == "system:serviceaccount:agent:sa1"
+
+        # Permission Condition 1: Metadata method must be 'tools/call'
+        input.parsed_body.method == "tools/call"
+
+        tool_name := input.parsed_body.params.name
+        allow_tool_list_sa1[tool_name]
+    }
+---
