@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent2
+  namespace: agent-spiffe
+  labels:
+    app: agent2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent2
+  template:
+    metadata:
+      labels:
+        app: agent2
+    spec:
+      containers:
+      - name: mcp-agent
+        image: docker.io/hmeng/agent-spiffe:v1
+        imagePullPolicy: Always
+        env:
+        - name: MCP_SERVER_URL
+          value: "http://envoy-service.envoy-gateway-system.svc.cluster.local:10001"
+        command: ["/bin/sh", "-c", "python -u agent.py && sleep infinity"]
+        # Add resource limits and requests as appropriate for your environment
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+      serviceAccountName: sa2
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa2
+  namespace: agent-spiffe

@@ -1,0 +1,4 @@
+TAG=v12
+docker build --no-cache -t hmeng/agent-spiffe:$TAG .
+docker push docker.io/hmeng/agent-spiffe:$TAG
+kubectl apply -f deployment.yaml

@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy-deployment
+  namespace: envoy-gateway-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoy
+  template:
+    metadata:
+      labels:
+        app: envoy
+    spec:
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:contrib-v1.36-latest
+        imagePullPolicy: Always
+        command: ["/usr/local/bin/envoy"]
+        args: ["-c", "/etc/envoy/envoy.yaml", "-l", "trace", "--log-path", "/dev/stderr"]
+        ports:
+        - name: http
+          containerPort: 10001
+        volumeMounts:
+        - name: envoy-config-volume
+          mountPath: /etc/envoy/envoy.yaml
+          subPath: deepwiki_calculator_k8s_spiffe.yaml
+        - mountPath: "/var/run/secrets/spiffe.io"
+          name: spiffe
+          # Standard location for many Linux distros to look for CA certs
+        - name: cert-bundle
+          mountPath: /etc/ssl/certs/trust-bundle.pem
+          subPath: trust-bundle.pem
+          readOnly: true
+      volumes:
+      - name: envoy-config-volume
+        configMap:
+          name: envoy-config
+      - name: spiffe
+        csi:
+          driver: spiffe.csi.cert-manager.io
+          readOnly: true
+      - name: cert-bundle
+        configMap:
+          name: example-bundle  # Must match the Bundle's metadata.name
+      serviceAccountName: envoy-sa
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-service
+  namespace: envoy-gateway-system
+spec:
+  type: ClusterIP
+  selector:
+    app: envoy
+  ports:
+  - protocol: TCP
+    port: 10001 # Port for the service itself
+    targetPort: 10001 # Port on the Envoy pod
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: envoy-sa
+  namespace: envoy-gateway-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cert-manager-requester
+  namespace: envoy-gateway-system
+rules:
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificaterequests"]
+  verbs: ["create", "get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: envoy-sa-cert-manager-requester
+  namespace: envoy-gateway-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cert-manager-requester
+subjects:
+- kind: ServiceAccount
+  name: envoy-sa
+  namespace: envoy-gateway-system

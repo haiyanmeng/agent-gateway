@@ -17,6 +17,8 @@ static_resources:
               - name: local_service
                 domains: ["*"]
                 routes:
+                # Optional: Add a health check or default route to avoid 404s on '/'
+
                 - match:
                     path: "/mcp-server1/mcp"
                   route:
@@ -70,12 +72,9 @@ static_resources:
                                                         exact: "tools/list"
                                     "rule-0":
                                       principals:
-                                      - or_ids:
-                                          ids:
-                                          - header:
-                                              name: "x-user-role"
-                                              string_match:
-                                                exact: "system:serviceaccount:agent:sa1"
+                                      - authenticated:
+                                          principal_name:
+                                            exact: "spiffe://my.trust.domain/ns/agent-spiffe/sa/adk-agent-sa"
                                       permissions:
                                       - and_rules:
                                           rules:
@@ -102,12 +101,9 @@ static_resources:
                                                         exact: "subtract"
                                     "rule-1":
                                       principals:
-                                      - or_ids:
-                                          ids:
-                                          - header:
-                                              name: "x-user-role"
-                                              string_match:
-                                                exact: "system:serviceaccount:agent:sa2"
+                                      - authenticated:
+                                          principal_name:
+                                            exact: "spiffe://my.trust.domain/ns/agent-spiffe/sa/sa2"
                                       permissions:
                                       - and_rules:
                                           rules:
@@ -182,12 +178,9 @@ static_resources:
                                                         exact: "tools/list"
                                     "rule-0":
                                       principals:
-                                      - or_ids:
-                                          ids:
-                                          - header:
-                                              name: "x-user-role"
-                                              string_match:
-                                                exact: "system:serviceaccount:agent:sa2"
+                                      - authenticated:
+                                          principal_name:
+                                            exact: "spiffe://my.trust.domain/ns/agent-spiffe/sa/sa2"
                                       permissions:
                                       - and_rules:
                                           rules:
@@ -211,37 +204,11 @@ static_resources:
                     prefix_rewrite: "/mcp"
                     # The host header will be rewritten to the upstream's hostname
                     host_rewrite_literal: mcp.deepwiki.com
+                - match: { prefix: "/" }
+                  direct_response:
+                    status: 200
+                    body: { inline_string: "Envoy mTLS Mesh is Healthy\n" }
             http_filters:
-            - name: envoy.filters.http.jwt_authn
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
-                # Define the token issuers (providers)
-                providers:
-                  kubernetes_provider:
-                    # This MUST match the 'iss' claim in the Kubernetes service account JWT
-                    # issuer: https://kubernetes.default.svc.cluster.local # issuer of a KIND cluster
-                    issuer: https://container.googleapis.com/v1/projects/haiyanmeng-gke-dev/locations/us-central1/clusters/cluster-1 # issuer of a GKE cluster
-                    remote_jwks:
-                      http_uri:
-                        # This is the standard K8s OIDC JWKS endpoint
-                        uri: https://kubernetes.default.svc/openid/v1/jwks
-                        # This cluster must be defined in your static_resources
-                        cluster: kubernetes_api_cluster
-                        timeout: 5s
-                      # Cache the keys for 1 hour to avoid spamming the API server
-                      cache_duration: 3600s
-                    from_headers:
-                    - name: x-k8s-sa-token
-                    claim_to_headers:
-                    - claim_name: sub # example: system:serviceaccount:agent:sa1
-                      header_name: x-user-role
-                # Define rules for applying the filter
-                rules:
-                  # This rule applies the JWT check to all incoming requests
-                  - match: { prefix: "/" }
-                    requires:
-                      # Specifies which provider to use for this rule
-                      provider_name: kubernetes_provider
             - name: envoy.filters.http.mcp
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
@@ -251,6 +218,31 @@ static_resources:
             - name: envoy.filters.http.router
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        # reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/security/secret#example-one-static-resource
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+            common_tls_context:
+              # Reference the names defined in the sds_resources block below
+              tls_certificate_sds_secret_configs:
+              - name: spiffe_identity
+              validation_context_sds_secret_config:
+                name: spiffe_trust
+            require_client_certificate: true
+
+  # This is where we "fold" the SDS definitions into the main config
+  secrets:
+  - name: spiffe_identity
+    tls_certificate:
+      certificate_chain:
+        filename: /var/run/secrets/spiffe.io/tls.crt
+      private_key:
+        filename: /var/run/secrets/spiffe.io/tls.key
+  - name: spiffe_trust
+    validation_context:
+      trusted_ca:
+        filename: /etc/ssl/certs/trust-bundle.pem
 
   clusters:
   - name: mcp-server1
@@ -280,29 +272,7 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: mcp.deepwiki.com # Server Name Indication is required for TLS handshake
-  - name: kubernetes_api_cluster
-    type: LOGICAL_DNS
-    # Use port 443 for HTTPS
-    load_assignment:
-      cluster_name: kubernetes_api_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: kubernetes.default.svc
-                port_value: 443
-    # This section is critical for making HTTPS work
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        sni: kubernetes.default.svc
-        common_tls_context:
-          validation_context:
-            # This tells Envoy to trust the K8s API server's cert
-            trusted_ca:
-              filename: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
 admin:
   address:
     socket_address:

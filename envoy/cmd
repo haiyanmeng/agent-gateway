@@ -1,5 +1,7 @@
+ENVOY_CONFIG_FILE=deepwiki_calculator_k8s_spiffe.yaml
+K8S_CONFIG_FILE=k8s_config_spiffe.yaml
 kubectl delete cm envoy-config -n envoy-gateway-system
-kubectl create configmap envoy-config --from-file=deepwiki_calculator_k8s_opa.yaml -n envoy-gateway-system
-kubectl delete -f k8s_config_opa.yaml
+kubectl create configmap envoy-config --from-file=$ENVOY_CONFIG_FILE -n envoy-gateway-system
+kubectl delete -f $K8S_CONFIG_FILE
 sleep 10
-kubectl apply -f k8s_config_opa.yaml
+kubectl apply -f $K8S_CONFIG_FILE
