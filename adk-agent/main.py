@@ -26,6 +26,12 @@ logger = logging.getLogger(__name__)
 import uvicorn
 from fastapi import FastAPI
 from google.adk.cli.fast_api import get_fast_api_app
+from contextlib import asynccontextmanager
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+# Import the objects from your agent.py
+from mcp_agent.agent import my_ssl_context, reload_certificates
 
 # Get the directory where main.py is located
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +42,30 @@ ALLOWED_ORIGINS = ["http://localhost", "http://localhost:8080", "*"]
 # Set web=True if you intend to serve a web interface, False otherwise
 SERVE_WEB_INTERFACE = True
 
+# --- Watchdog Logic ---
+class CertRotationHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        # Trigger reload if the cert or key files are modified
+        if event.src_path in [os.environ.get("CLIENT_CERT_FILE"), os.environ.get("CLIENT_KEY_FILE")]:
+            logger.info(f"Change detected in {event.src_path}. Rotating SSL context...")
+            reload_certificates(my_ssl_context)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP ---
+    cert_dir = os.path.dirname(os.environ.get("CLIENT_CERT_FILE", "/var/run/secrets/spiffe.io/"))
+
+    observer = Observer()
+    observer.schedule(CertRotationHandler(), path=cert_dir, recursive=False)
+    observer.start()
+    logger.info(f"mTLS Rotation Watcher started for directory: {cert_dir}")
+
+    yield  # Agent is now serving requests
+
+    # --- SHUTDOWN ---
+    observer.stop()
+    observer.join()
+
 # Call the function to get the FastAPI app instance
 # Ensure the agent directory name ('capital_agent') matches your agent folder
 app: FastAPI = get_fast_api_app(
@@ -44,6 +74,9 @@ app: FastAPI = get_fast_api_app(
     allow_origins=ALLOWED_ORIGINS,
     web=SERVE_WEB_INTERFACE,
 )
+
+# Inject the lifespan into the ADK-provided FastAPI app
+app.router.lifespan_context = lifespan
 
 # You can add more FastAPI routes or configurations below if needed
 # Example:

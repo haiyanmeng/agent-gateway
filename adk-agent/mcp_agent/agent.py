@@ -22,8 +22,11 @@ import httpx
 
 import httpcore._backends.anyio
 
-# Force the underlying library to ignore the hostname during the TLS handshake
-original_start_tls = httpcore._backends.anyio.AnyIOStream.start_tls
+
+cert_file = os.environ.get("CLIENT_CERT_FILE")
+key_file = os.environ.get("CLIENT_KEY_FILE")
+ca_bundle_file = os.environ.get("SSL_CERT_FILE")
+
 
 # # This globally overrides the match_hostname function to always return True
 # # This is safe here because you are already verifying the CA bundle 
@@ -36,15 +39,6 @@ original_start_tls = httpcore._backends.anyio.AnyIOStream.start_tls
 # Use SSLContext directly to avoid the "Default" presets that force hostname matching
 my_ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
-# Load the Agent's identity
-my_ssl_context.load_cert_chain(
-    certfile="/var/run/secrets/spiffe.io/tls.crt", 
-    keyfile="/var/run/secrets/spiffe.io/tls.key"
-)
-
-# Load the Trust Bundle
-my_ssl_context.load_verify_locations(cafile="/etc/ssl/certs/trust-bundle.pem")
-
 # CRITICAL: Disable hostname check at the context level
 my_ssl_context.check_hostname = False
 my_ssl_context.verify_mode = ssl.CERT_REQUIRED
@@ -54,6 +48,23 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+def reload_certificates(ctx):
+    """Reloads the certificate chain and CA bundle into the provided context."""
+    try:
+        if all(os.path.exists(p) for p in [cert_file, key_file, ca_bundle_file]):
+            # reload_cert_chain clears the old one and loads the new one
+            ctx.load_cert_chain(certfile=cert_file, keyfile=key_file)
+            # load_verify_locations appends/updates the CA bundle
+            ctx.load_verify_locations(cafile=ca_bundle_file)
+            logger.info("SSL Context successfully reloaded with new certificates.")
+        else:
+            logger.warning("Certificate files missing; skipping reload.")
+    except Exception as e:
+        logger.error(f"Failed to reload certificates: {e}")
+
+# Initial Load
+reload_certificates(my_ssl_context)
 
 for path in ["/var/run/secrets/spiffe.io/tls.crt", "/var/run/secrets/spiffe.io/tls.key", "/etc/ssl/certs/trust-bundle.pem"]:
     if os.path.exists(path):
@@ -65,6 +76,9 @@ for path in ["/var/run/secrets/spiffe.io/tls.crt", "/var/run/secrets/spiffe.io/t
 # Verify the context has the cert and the trust bundle
 logger.debug(f"SSL Context loaded certs: {len(my_ssl_context.get_ca_certs())}")
 logger.debug(f"SSL Context verify mode: {my_ssl_context.verify_mode}")
+
+# Force the underlying library to ignore the hostname during the TLS handshake
+original_start_tls = httpcore._backends.anyio.AnyIOStream.start_tls
 
 async def patched_start_tls(self, ssl_context, server_hostname=None, timeout=None):
     # Log the hostname captured from the high-level request (e.g., Gemini or Envoy)
