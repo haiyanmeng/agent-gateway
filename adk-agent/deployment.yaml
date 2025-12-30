@@ -23,7 +23,7 @@ spec:
       containers:
         - name: adk-agent
           imagePullPolicy: Always
-          image: docker.io/hmeng/agent-spiffe:v25
+          image: docker.io/hmeng/agent-spiffe:v26
           resources:
             limits:
               memory: "512Mi"

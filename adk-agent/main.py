@@ -44,11 +44,17 @@ SERVE_WEB_INTERFACE = True
 
 # --- Watchdog Logic ---
 class CertRotationHandler(FileSystemEventHandler):
-    def on_modified(self, event):
-        # Trigger reload if the cert or key files are modified
-        if event.src_path in [os.environ.get("CLIENT_CERT_FILE"), os.environ.get("CLIENT_KEY_FILE")]:
-            logger.info(f"Change detected in {event.src_path}. Rotating SSL context...")
-            reload_certificates(my_ssl_context)
+    def on_any_event(self, event):
+        # Kubernetes secret updates look like a directory deletion/creation (symlink swap)
+        # We listen for ANY event in the cert directory and trigger a reload.
+
+        # Log to verify the watcher is seeing SOMETHING
+        logger.debug(f"Watchdog event detected: {event.event_type} on {event.src_path}")
+
+        # We don't filter by specific file path because the symlink swap
+        # might not match your CLIENT_CERT_FILE path exactly in the event metadata.
+        logger.info("Potential certificate rotation detected. Reloading SSL context...")
+        reload_certificates(my_ssl_context)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
