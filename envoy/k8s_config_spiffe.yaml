@@ -33,6 +33,14 @@ spec:
           mountPath: /etc/ssl/certs/trust-bundle.pem
           subPath: trust-bundle.pem
           readOnly: true
+        - name: spiffe-identity-config
+          mountPath: /etc/envoy/sds/spiffe_identity.yaml
+          subPath: spiffe_identity.yaml
+          readOnly: true
+        - name: spiffe-trust-config
+          mountPath: /etc/envoy/sds/spiffe_trust.yaml
+          subPath: spiffe_trust.yaml
+          readOnly: true
       volumes:
       - name: envoy-config-volume
         configMap:
@@ -44,6 +52,12 @@ spec:
       - name: cert-bundle
         configMap:
           name: example-bundle  # Must match the Bundle's metadata.name
+      - name: spiffe-identity-config
+        configMap:
+          name: spiffe-identity-config
+      - name: spiffe-trust-config
+        configMap:
+          name: spiffe-trust-config
       serviceAccountName: envoy-sa
 ---
 apiVersion: v1

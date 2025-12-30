@@ -1,3 +1,10 @@
+# When Envoy uses the SDS API (even for local files), it needs to identify itself.
+# This "node identity" is used for logging, metrics, and in more advanced scenarios, for fetching secrets from a remote management server.
+# Even though we're using local files, the API structure still requires this identification. It doesn't know which Envoy is asking for the secret otherwise.
+node:
+  id: "envoy-sds-node"
+  cluster: "envoy-sds-cluster"
+
 static_resources:
   listeners:
   - name: listener_0
@@ -236,25 +243,19 @@ static_resources:
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
             common_tls_context:
-              # Reference the names defined in the sds_resources block below
               tls_certificate_sds_secret_configs:
-              - name: spiffe_identity
+              - name: "spiffe_identity"
+                sds_config:
+                  resource_api_version: V3
+                  path_config_source:
+                    path: "/etc/envoy/sds/spiffe_identity.yaml"
               validation_context_sds_secret_config:
-                name: spiffe_trust
+                name: "spiffe_trust"
+                sds_config:
+                  resource_api_version: V3
+                  path_config_source:
+                    path: "/etc/envoy/sds/spiffe_trust.yaml"
             require_client_certificate: true
-
-  # This is where we "fold" the SDS definitions into the main config
-  secrets:
-  - name: spiffe_identity
-    tls_certificate:
-      certificate_chain:
-        filename: /var/run/secrets/spiffe.io/tls.crt
-      private_key:
-        filename: /var/run/secrets/spiffe.io/tls.key
-  - name: spiffe_trust
-    validation_context:
-      trusted_ca:
-        filename: /etc/ssl/certs/trust-bundle.pem
 
   clusters:
   - name: mcp-server1
