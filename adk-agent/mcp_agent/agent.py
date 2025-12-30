@@ -20,29 +20,34 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnecti
 import ssl
 import httpx
 
-# This globally overrides the match_hostname function to always return True
-# This is safe here because you are already verifying the CA bundle 
-# and using mTLS (Mutual trust).
-def match_hostname_patch(cert, hostname):
-    return
+import httpcore._backends.anyio
 
-ssl.match_hostname = match_hostname_patch
+# Force the underlying library to ignore the hostname during the TLS handshake
+original_start_tls = httpcore._backends.anyio.AnyIOStream.start_tls
+
+# # This globally overrides the match_hostname function to always return True
+# # This is safe here because you are already verifying the CA bundle 
+# # and using mTLS (Mutual trust).
+# def match_hostname_patch(cert, hostname):
+#     return
+
+# ssl.match_hostname = match_hostname_patch
 
 # Use SSLContext directly to avoid the "Default" presets that force hostname matching
-ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+my_ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
 # Load the Agent's identity
-ssl_context.load_cert_chain(
+my_ssl_context.load_cert_chain(
     certfile="/var/run/secrets/spiffe.io/tls.crt", 
     keyfile="/var/run/secrets/spiffe.io/tls.key"
 )
 
 # Load the Trust Bundle
-ssl_context.load_verify_locations(cafile="/etc/ssl/certs/trust-bundle.pem")
+my_ssl_context.load_verify_locations(cafile="/etc/ssl/certs/trust-bundle.pem")
 
 # CRITICAL: Disable hostname check at the context level
-ssl_context.check_hostname = False
-ssl_context.verify_mode = ssl.CERT_REQUIRED
+my_ssl_context.check_hostname = False
+my_ssl_context.verify_mode = ssl.CERT_REQUIRED
 
 # Add these lines to configure logging
 logging.basicConfig(
@@ -50,26 +55,42 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+for path in ["/var/run/secrets/spiffe.io/tls.crt", "/var/run/secrets/spiffe.io/tls.key", "/etc/ssl/certs/trust-bundle.pem"]:
+    if os.path.exists(path):
+        size = os.path.getsize(path)
+        logger.info(f"FILE CHECK: {path} exists, size: {size} bytes")
+    else:
+        logger.error(f"FILE CHECK: {path} MISSING!")
+
 # Verify the context has the cert and the trust bundle
-logger.debug(f"SSL Context loaded certs: {ssl_context.get_ca_certs()}")
-logger.debug(f"SSL Context verify mode: {ssl_context.verify_mode}")
+logger.debug(f"SSL Context loaded certs: {len(my_ssl_context.get_ca_certs())}")
+logger.debug(f"SSL Context verify mode: {my_ssl_context.verify_mode}")
+
+async def patched_start_tls(self, ssl_context, server_hostname=None, timeout=None):
+    # Log the hostname captured from the high-level request (e.g., Gemini or Envoy)
+    logger.debug(f"DEBUG: patched_start_tls called for hostname: {server_hostname}")
+    
+    # Apply targeted logic
+    if server_hostname and "envoy-service" in server_hostname:
+        logger.debug("DEBUG: Custom Envoy context applied. Bypassing hostname check.")
+        return await original_start_tls(self, my_ssl_context, server_hostname=None, timeout=timeout)
+    
+    # For Google Gemini or other public APIs, use the original context.
+    # For example, generativelanguage.googleapis.com
+    logger.debug(f"DEBUG: Using standard system context for {server_hostname}")
+    return await original_start_tls(self, ssl_context, server_hostname=server_hostname, timeout=timeout)
+
+httpcore._backends.anyio.AnyIOStream.start_tls = patched_start_tls
 
 envoy_service = os.environ.get("ENVOY_SERVICE")
-
-# Standalone test inside your script
-with httpx.Client(verify=ssl_context, cert=("/var/run/secrets/spiffe.io/tls.crt", "/var/run/secrets/spiffe.io/tls.key")) as client:
-    try:
-        test_res = client.get(f"https://{envoy_service}/")
-        logger.info(f"Standalone HTTPX test successful: {test_res.status_code}")
-    except Exception as e:
-        logger.error(f"Standalone HTTPX test failed: {e}")
 
 try:
     local_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             url=f"https://{envoy_service}/mcp-server1/mcp",
-            ssl_context=ssl_context,
-            server_hostname="spiffe://my.trust.domain/ns/envoy-gateway-system/sa/envoy-sa",
+            # ssl_context=my_ssl_context,
+            # server_hostname="spiffe://my.trust.domain/ns/envoy-gateway-system/sa/envoy-sa",
+            # server_hostname=None, # Explicitly tell it there is no name to match
         ),
     )
     logger.info("McpToolset local_mcp initialized successfully.")
@@ -80,8 +101,9 @@ try:
     remote_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             url=f"https://{envoy_service}/mcp-server2/mcp",
-            ssl_context=ssl_context,
-            server_hostname="spiffe://my.trust.domain/ns/envoy-gateway-system/sa/envoy-sa",
+            # ssl_context=my_ssl_context,
+            # server_hostname="spiffe://my.trust.domain/ns/envoy-gateway-system/sa/envoy-sa",
+            # server_hostname=None, # Explicitly tell it there is no name to match
         ),
     )
     logger.info("McpToolset remote_mcp initialized successfully.")
