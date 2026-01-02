@@ -22,19 +22,17 @@ import httpx
 
 import httpcore._backends.anyio
 
+# Add these lines to configure logging
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 cert_file = os.environ.get("CLIENT_CERT_FILE")
 key_file = os.environ.get("CLIENT_KEY_FILE")
 ca_bundle_file = os.environ.get("SSL_CERT_FILE")
 
-
-# # This globally overrides the match_hostname function to always return True
-# # This is safe here because you are already verifying the CA bundle 
-# # and using mTLS (Mutual trust).
-# def match_hostname_patch(cert, hostname):
-#     return
-
-# ssl.match_hostname = match_hostname_patch
+envoy_service = os.environ.get("ENVOY_SERVICE")
 
 # Use SSLContext directly to avoid the "Default" presets that force hostname matching
 my_ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -42,12 +40,6 @@ my_ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 # CRITICAL: Disable hostname check at the context level
 my_ssl_context.check_hostname = False
 my_ssl_context.verify_mode = ssl.CERT_REQUIRED
-
-# Add these lines to configure logging
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
 def reload_certificates(ctx):
     """Reloads the certificate chain and CA bundle into the provided context."""
@@ -65,17 +57,6 @@ def reload_certificates(ctx):
 
 # Initial Load
 reload_certificates(my_ssl_context)
-
-for path in ["/var/run/secrets/spiffe.io/tls.crt", "/var/run/secrets/spiffe.io/tls.key", "/etc/ssl/certs/trust-bundle.pem"]:
-    if os.path.exists(path):
-        size = os.path.getsize(path)
-        logger.info(f"FILE CHECK: {path} exists, size: {size} bytes")
-    else:
-        logger.error(f"FILE CHECK: {path} MISSING!")
-
-# Verify the context has the cert and the trust bundle
-logger.debug(f"SSL Context loaded certs: {len(my_ssl_context.get_ca_certs())}")
-logger.debug(f"SSL Context verify mode: {my_ssl_context.verify_mode}")
 
 # Force the underlying library to ignore the hostname during the TLS handshake
 original_start_tls = httpcore._backends.anyio.AnyIOStream.start_tls
@@ -96,15 +77,10 @@ async def patched_start_tls(self, ssl_context, server_hostname=None, timeout=Non
 
 httpcore._backends.anyio.AnyIOStream.start_tls = patched_start_tls
 
-envoy_service = os.environ.get("ENVOY_SERVICE")
-
 try:
     local_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             url=f"https://{envoy_service}/mcp-server1/mcp",
-            # ssl_context=my_ssl_context,
-            # server_hostname="spiffe://my.trust.domain/ns/envoy-gateway-system/sa/envoy-sa",
-            # server_hostname=None, # Explicitly tell it there is no name to match
         ),
     )
     logger.info("McpToolset local_mcp initialized successfully.")
@@ -115,9 +91,6 @@ try:
     remote_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             url=f"https://{envoy_service}/mcp-server2/mcp",
-            # ssl_context=my_ssl_context,
-            # server_hostname="spiffe://my.trust.domain/ns/envoy-gateway-system/sa/envoy-sa",
-            # server_hostname=None, # Explicitly tell it there is no name to match
         ),
     )
     logger.info("McpToolset remote_mcp initialized successfully.")
