@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spiffe-trust-config
+  namespace: envoy-gateway-system
+data:
+  spiffe_trust.yaml: |
+    resources:
+    - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+      name: "spiffe_trust"
+      validation_context:
+        trusted_ca:
+          filename: "/var/run/secrets/spiffe.io/trust-bundle.pem"

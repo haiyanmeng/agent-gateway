@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: envoy-deployment
+  namespace: envoy-gateway-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoy
+  template:
+    metadata:
+      labels:
+        app: envoy
+    spec:
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:contrib-v1.36-latest
+        imagePullPolicy: Always
+        command: ["/usr/local/bin/envoy"]
+        args: ["-c", "/etc/envoy/envoy.yaml", "-l", "trace", "--log-path", "/dev/stderr"]
+        ports:
+        - name: http
+          containerPort: 10001
+        volumeMounts:
+        - name: envoy-config-volume
+          mountPath: /etc/envoy/envoy.yaml
+          subPath: deepwiki_calculator_k8s_spiffe_pod_cert.yaml
+        - mountPath: "/var/run/secrets/spiffe.io"
+          name: tls-config
+          readOnly: true
+        - name: spiffe-identity-config
+          mountPath: /etc/envoy/sds/spiffe_identity.yaml
+          subPath: spiffe_identity.yaml
+          readOnly: true
+        - name: spiffe-trust-config
+          mountPath: /etc/envoy/sds/spiffe_trust.yaml
+          subPath: spiffe_trust.yaml
+          readOnly: true
+      volumes:
+      - name: envoy-config-volume
+        configMap:
+          name: envoy-config
+      - name: tls-config
+        projected:
+          sources:
+          - clusterTrustBundle:
+              signerName: row-major.net/spiffe
+              labelSelector:
+                matchLabels:
+                  "spiffe.row-major.net/canarying": "live"
+                  "spiffe.row-major.net/trust-domain": "cluster.local"
+              path: trust-bundle.pem
+          - podCertificate:
+              signerName: row-major.net/service-dns
+              keyType: ECDSAP256
+              keyPath: tls.key
+              certificateChainPath: tls.crt
+      - name: spiffe-identity-config
+        configMap:
+          name: spiffe-identity-config
+      - name: spiffe-trust-config
+        configMap:
+          name: spiffe-trust-config
+      serviceAccountName: envoy-sa
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: envoy-service
+  namespace: envoy-gateway-system
+spec:
+  type: ClusterIP
+  selector:
+    app: envoy
+  ports:
+  - protocol: TCP
+    port: 10001 # Port for the service itself
+    targetPort: 10001 # Port on the Envoy pod
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: envoy-sa
+  namespace: envoy-gateway-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cert-manager-requester
+  namespace: envoy-gateway-system
+rules:
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificaterequests"]
+  verbs: ["create", "get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: envoy-sa-cert-manager-requester
+  namespace: envoy-gateway-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cert-manager-requester
+subjects:
+- kind: ServiceAccount
+  name: envoy-sa
+  namespace: envoy-gateway-system
