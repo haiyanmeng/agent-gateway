@@ -1,4 +1,4 @@
-TAG=v27
+TAG=v29
 docker build -t hmeng/agent-spiffe:$TAG .
 docker push docker.io/hmeng/agent-spiffe:$TAG
 kubectl apply -f deployment.yaml

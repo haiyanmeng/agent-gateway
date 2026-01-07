@@ -36,9 +36,6 @@ envoy_service = os.environ.get("ENVOY_SERVICE")
 
 # Use SSLContext directly to avoid the "Default" presets that force hostname matching
 my_ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-
-# CRITICAL: Disable hostname check at the context level
-my_ssl_context.check_hostname = False
 my_ssl_context.verify_mode = ssl.CERT_REQUIRED
 
 def reload_certificates(ctx):

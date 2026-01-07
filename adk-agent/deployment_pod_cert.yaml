@@ -23,7 +23,7 @@ spec:
       containers:
         - name: adk-agent
           imagePullPolicy: Always
-          image: docker.io/hmeng/agent-spiffe:v29
+          image: docker.io/hmeng/agent-spiffe:v27
           resources:
             limits:
               memory: "512Mi"
@@ -37,9 +37,9 @@ spec:
             - containerPort: 8080
           env:
             - name: SSL_CERT_FILE
-              value: /etc/ssl/certs/trust-bundle.pem
+              value: /var/run/secrets/spiffe.io/trust-bundle.pem
             - name: REQUESTS_CA_BUNDLE
-              value: /etc/ssl/certs/trust-bundle.pem
+              value: /var/run/secrets/spiffe.io/trust-bundle.pem
             - name: CLIENT_CERT_FILE
               value: /var/run/secrets/spiffe.io/tls.crt
             - name: CLIENT_KEY_FILE
@@ -54,21 +54,24 @@ spec:
                   name: google-secret
                   key: google-api-key
           volumeMounts:
-          - mountPath: /var/run/secrets/spiffe.io
-            name: spiffe
-          - mountPath: /etc/ssl/certs/trust-bundle.pem
-            subPath: trust-bundle.pem
-            name: cert-bundle
+          - mountPath: "/var/run/secrets/spiffe.io"
+            name: tls-config
             readOnly: true
       volumes:
-      - csi:
-          driver: spiffe.csi.cert-manager.io
-          readOnly: true
-        name: spiffe
-      - configMap:
-          defaultMode: 420
-          name: example-bundle
-        name: cert-bundle
+      - name: tls-config
+        projected:
+          sources:
+          - clusterTrustBundle:
+              signerName: row-major.net/service-dns
+              labelSelector:
+                matchLabels:
+                  "service-dns.row-major.net/canarying": "live"
+              path: trust-bundle.pem
+          - podCertificate:
+              signerName: row-major.net/spiffe
+              keyType: ECDSAP256
+              keyPath: tls.key
+              certificateChainPath: tls.crt
 ---
 apiVersion: v1
 kind: Service
