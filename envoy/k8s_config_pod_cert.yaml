@@ -83,27 +83,3 @@ kind: ServiceAccount
 metadata:
   name: envoy-sa
   namespace: envoy-gateway-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: cert-manager-requester
-  namespace: envoy-gateway-system
-rules:
-- apiGroups: ["cert-manager.io"]
-  resources: ["certificaterequests"]
-  verbs: ["create", "get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: envoy-sa-cert-manager-requester
-  namespace: envoy-gateway-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: cert-manager-requester
-subjects:
-- kind: ServiceAccount
-  name: envoy-sa
-  namespace: envoy-gateway-system
