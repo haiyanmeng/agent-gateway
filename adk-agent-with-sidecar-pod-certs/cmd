@@ -1,4 +1,4 @@
-TAG=v25
+TAG=v26
 docker build -t hmeng/agent:$TAG .
 docker push docker.io/hmeng/agent:$TAG
 

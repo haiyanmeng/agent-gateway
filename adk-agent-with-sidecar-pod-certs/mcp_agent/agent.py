@@ -30,10 +30,6 @@ try:
     local_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             url=f"http://{envoy_service}/mcp-server1/mcp",
-            # The default timeout is 5s, and is not long enough
-            # to create a MCP session when an envoy sidecar is used
-            # for mTLS authentication.
-            timeout=20,
         ),
     )
     logger.info("McpToolset local_mcp initialized successfully.")
@@ -44,7 +40,6 @@ try:
     remote_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             url=f"http://{envoy_service}/mcp-server2/mcp",
-            timeout=20,
         ),
     )
     logger.info("McpToolset remote_mcp initialized successfully.")
