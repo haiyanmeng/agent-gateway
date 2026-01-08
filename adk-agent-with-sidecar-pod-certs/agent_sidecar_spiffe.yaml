@@ -58,12 +58,19 @@ static_resources:
               resource_api_version: V3
               path_config_source:
                 path: "/etc/envoy/sds/spiffe_identity.yaml"
-          validation_context_sds_secret_config:
-            name: "spiffe_trust"
-            sds_config:
-              resource_api_version: V3
-              path_config_source:
-                path: "/etc/envoy/sds/spiffe_trust.yaml"
+          combined_validation_context:
+            default_validation_context:
+              # This ensures Envoy only connects to a server with this specific identity
+              match_typed_subject_alt_names:
+              - san_type: URI
+                matcher:
+                  exact: "spiffe://cluster.local/ns/envoy-gateway-system/sa/envoy-sa"
+            validation_context_sds_secret_config:
+              name: "spiffe_trust"
+              sds_config:
+                resource_api_version: V3
+                path_config_source:
+                  path: "/etc/envoy/sds/spiffe_trust.yaml"
 
 admin:
   address:

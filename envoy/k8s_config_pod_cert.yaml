@@ -52,10 +52,26 @@ spec:
                   "spiffe.row-major.net/trust-domain": "cluster.local"
               path: trust-bundle.pem
           - podCertificate:
-              signerName: row-major.net/service-dns
+              signerName: row-major.net/spiffe
               keyType: ECDSAP256
               keyPath: tls.key
               certificateChainPath: tls.crt
+      # The following config does not assign a SPIFFE ID to the Envoy Gateway
+      # - name: tls-config
+      #   projected:
+      #     sources:
+      #     - clusterTrustBundle:
+      #         signerName: row-major.net/spiffe
+      #         labelSelector:
+      #           matchLabels:
+      #             "spiffe.row-major.net/canarying": "live"
+      #             "spiffe.row-major.net/trust-domain": "cluster.local"
+      #         path: trust-bundle.pem
+      #     - podCertificate:
+      #         signerName: row-major.net/service-dns
+      #         keyType: ECDSAP256
+      #         keyPath: tls.key
+      #         certificateChainPath: tls.crt
       - name: spiffe-identity-config
         configMap:
           name: spiffe-identity-config
