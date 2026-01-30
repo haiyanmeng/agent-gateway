@@ -34,7 +34,7 @@ static_resources:
                         - name: mcp-server1
                           weight: 100
                           typed_per_filter_config:
-                            envoy.filters.http.rbac:
+                            envoy.filters.http.rbac.backend_level:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
                               rbac:
                                 rules:
@@ -148,7 +148,7 @@ static_resources:
                         - name: mcp-server2
                           weight: 100
                           typed_per_filter_config:
-                            envoy.filters.http.rbac:
+                            envoy.filters.http.rbac.backend_level:
                               "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
                               rbac:
                                 rules:
@@ -231,7 +231,36 @@ static_resources:
             - name: envoy.filters.http.mcp
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
-            - name: envoy.filters.http.rbac
+            - name: envoy.filters.http.rbac.gateway_level  # this RBAC comes from the AccessPolicy object targeting Gateway
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+                rules:
+                  action: DENY
+                  policies:
+                    "deny-anyone-to-use-add-tool":
+                      principals:
+                        - any: true
+                      permissions:
+                        - and_rules:
+                            rules:
+                              - sourced_metadata:
+                                  metadata_matcher:
+                                    filter: "mcp_proxy"
+                                    path:
+                                      - key: "method"
+                                    value:
+                                      string_match:
+                                        exact: "tools/call"
+                              - sourced_metadata:
+                                  metadata_matcher:
+                                    filter: "mcp_proxy"
+                                    path:
+                                      - key: "params"
+                                      - key: "name"
+                                    value:
+                                      string_match:
+                                        exact: "add"
+            - name: envoy.filters.http.rbac.backend_level  # this RBAC comes from the AccessPolicy object targeting Backend
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
             - name: envoy.filters.http.router
