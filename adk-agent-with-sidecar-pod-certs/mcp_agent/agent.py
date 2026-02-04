@@ -24,12 +24,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-envoy_service = os.environ.get("ENVOY_SERVICE")
+gateway_address = os.environ.get("GATEWAY_ADDRESS")
 
 try:
     local_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
-            url=f"http://{envoy_service}/mcp-server1/mcp",
+            url=f"http://{gateway_address}/mcp-server1/mcp",
         ),
     )
     logger.info("McpToolset local_mcp initialized successfully.")
@@ -39,7 +39,7 @@ except Exception as e:
 try:
     remote_mcp = McpToolset(
         connection_params=StreamableHTTPConnectionParams(
-            url=f"http://{envoy_service}/mcp-server2/mcp",
+            url=f"http://{gateway_address}/mcp-server2/mcp",
         ),
     )
     logger.info("McpToolset remote_mcp initialized successfully.")
