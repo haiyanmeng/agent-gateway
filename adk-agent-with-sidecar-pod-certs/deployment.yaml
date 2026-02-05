@@ -20,6 +20,21 @@ spec:
         app: adk-agent
     spec:
       serviceAccountName: adk-agent-sa
+      initContainers:
+        - name: proxy-init
+          image: alpine:latest
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          command:
+            - sh
+            - -c
+            - |
+              apk add iptables
+              # Redirect all outbound TCP traffic on port 10001 to Envoy (localhost:10001)
+              # EXCEPT traffic coming from Envoy itself (UID 1337) to avoid infinite loops.
+              iptables -t nat -A OUTPUT -p tcp --dport 10001 -m owner ! --uid-owner 1337 -j REDIRECT --to-ports 10001
       containers:
         - name: adk-agent
           imagePullPolicy: Always
@@ -40,7 +55,7 @@ spec:
             - name: PORT
               value: "8080"
             - name: GATEWAY_ADDRESS
-              value: "127.0.0.1:10001"
+              value: "envoy-service.envoy-gateway-system.svc.cluster.local:10001"
             - name: GOOGLE_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -49,6 +64,8 @@ spec:
         - name: envoy
           image: envoyproxy/envoy:v1.36-latest
           imagePullPolicy: Always
+          securityContext:
+            runAsUser: 1337
           command: ["/usr/local/bin/envoy"]
           args: ["-c", "/etc/envoy/envoy.yaml", "-l", "trace", "--log-path", "/dev/stderr"]
           ports:
