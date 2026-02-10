@@ -1,0 +1,11 @@
+ENVOY_CONFIG_FILE=deepwiki_calculator_k8s_spiffe_pod_cert_two_gateway_level_rbac.yaml
+K8S_CONFIG_FILE=k8s_config_pod_cert_two_gateway_level_rbac.yaml
+kubectl delete cm envoy-config -n envoy-gateway-system
+kubectl create configmap envoy-config --from-file=$ENVOY_CONFIG_FILE -n envoy-gateway-system
+kubectl delete -f $K8S_CONFIG_FILE
+kubectl delete -f spiffe-identity-configmap.yaml
+kubectl delete -f spiffe-trust-configmap-pod-cert.yaml
+sleep 10
+kubectl apply -f spiffe-identity-configmap.yaml
+kubectl apply -f spiffe-trust-configmap-pod-cert.yaml
+kubectl apply -f $K8S_CONFIG_FILE
