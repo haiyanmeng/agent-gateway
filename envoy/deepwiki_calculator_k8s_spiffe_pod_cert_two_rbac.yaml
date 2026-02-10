@@ -300,6 +300,10 @@ static_resources:
                 port_value: 9000
   - name: mcp-server2
     type: LOGICAL_DNS
+    # If your Kubernetes cluster or network does not fully support IPv6, LOGICAL_DNS might resolve to
+    # an IPv6 address that Envoy cannot reach, resulting in a 503.
+    # Force IPv4 to ensure stability in standard K8s networks
+    dns_lookup_family: V4_ONLY
     load_assignment:
       cluster_name: mcp-server2
       endpoints:
