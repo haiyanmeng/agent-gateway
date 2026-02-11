@@ -1,0 +1,15 @@
+      - name: tls-config
+        projected:
+          sources:
+          - clusterTrustBundle:
+              signerName: kube-agentic-networking.sigs.k8s.io/identity
+              labelSelector:
+                matchLabels:
+                  "kube-agentic-networking.sigs.k8s.io/canarying":             "live"
+                  "kube-agentic-networking.sigs.k8s.io/workload-trust-domain": "cluster.local"
+              path: trust-bundle.pem
+          - podCertificate:
+              signerName: kube-agentic-networking.sigs.k8s.io/identity
+              keyType: ED25519
+              keyPath: tls.key
+              certificateChainPath: tls.crt
