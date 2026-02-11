@@ -75,8 +75,8 @@ spec:
           - name: envoy-config-volume
             mountPath: /etc/envoy/envoy.yaml
             subPath: agent_sidecar_spiffe.yaml
-          - mountPath: "/var/run/secrets/spiffe.io"
-            name: tls-config
+          - mountPath: /run/agent-identity-mtls
+            name: agent-identity-mtls
             readOnly: true
           - name: spiffe-identity-config
             mountPath: /etc/envoy/sds/spiffe_identity.yaml
@@ -90,7 +90,7 @@ spec:
       - name: envoy-config-volume
         configMap:
           name: envoy-config
-      - name: tls-config
+      - name: agent-identity-mtls
         projected:
           sources:
           - clusterTrustBundle:
@@ -99,7 +99,8 @@ spec:
                 matchLabels:
                   "kube-agentic-networking.sigs.k8s.io/canarying":             "live"
                   "kube-agentic-networking.sigs.k8s.io/workload-trust-domain": "cluster.local"
-              path: trust-bundle.pem
+                  "kube-agentic-networking.sigs.k8s.io/peer-trust-domain":     "cluster.local"
+              path: cluster.local.trust-bundle.pem
           - podCertificate:
               signerName: kube-agentic-networking.sigs.k8s.io/identity
               keyType: ECDSAP256

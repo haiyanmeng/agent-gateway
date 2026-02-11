@@ -10,4 +10,4 @@ data:
       name: "spiffe_trust"
       validation_context:
         trusted_ca:
-          filename: "/var/run/secrets/spiffe.io/trust-bundle.pem"
+          filename: "/run/agent-identity-mtls/cluster.local.trust-bundle.pem"
