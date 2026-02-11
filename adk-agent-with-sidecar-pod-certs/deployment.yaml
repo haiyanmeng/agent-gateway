@@ -38,7 +38,7 @@ spec:
       containers:
         - name: adk-agent
           imagePullPolicy: Always
-          image: docker.io/hmeng/agent:v27
+          image: docker.io/hmeng/agent:v28
           resources:
             limits:
               memory: "512Mi"
@@ -103,8 +103,9 @@ spec:
           - podCertificate:
               signerName: kube-agentic-networking.sigs.k8s.io/identity
               keyType: ECDSAP256
-              keyPath: tls.key
-              certificateChainPath: tls.crt
+              credentialBundlePath: cred-bundle.pem
+              # keyPath: tls.key
+              # certificateChainPath: tls.crt
       - name: spiffe-identity-config
         configMap:
           name: spiffe-identity-config

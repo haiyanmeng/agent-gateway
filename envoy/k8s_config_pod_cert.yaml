@@ -54,8 +54,9 @@ spec:
           - podCertificate:
               signerName: kube-agentic-networking.sigs.k8s.io/identity
               keyType: ECDSAP256
-              keyPath: tls.key
-              certificateChainPath: tls.crt
+              credentialBundlePath: cred-bundle.pem
+              # keyPath: tls.key
+              # certificateChainPath: tls.crt
       # The following config does not assign a SPIFFE ID to the Envoy Gateway
       # - name: tls-config
       #   projected:

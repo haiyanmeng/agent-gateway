@@ -47,7 +47,7 @@ except Exception as e:
     logger.error(f"Error initializing McpToolset remote_mcp: {e}")
 
 root_agent = LlmAgent(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     name="github_assistant_agent",
     # instruction="""You are my GitHub repository assistant.
     # Use the provided tools to help me manage my GitHub repositories.

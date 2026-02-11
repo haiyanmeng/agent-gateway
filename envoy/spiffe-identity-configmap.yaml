@@ -10,6 +10,6 @@ data:
       name: "spiffe_identity"
       tls_certificate:
         certificate_chain:
-          filename: "/var/run/secrets/spiffe.io/tls.crt"
+          filename: "/var/run/secrets/spiffe.io/cred-bundle.pem"
         private_key:
-          filename: "/var/run/secrets/spiffe.io/tls.key"
+          filename: "/var/run/secrets/spiffe.io/cred-bundle.pem"

@@ -10,6 +10,6 @@
               path: trust-bundle.pem
           - podCertificate:
               signerName: kube-agentic-networking.sigs.k8s.io/identity
-              keyType: ED25519
+              keyType: ECDSAP256
               keyPath: tls.key
               certificateChainPath: tls.crt
