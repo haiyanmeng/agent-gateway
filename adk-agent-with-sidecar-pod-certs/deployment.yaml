@@ -94,14 +94,14 @@ spec:
         projected:
           sources:
           - clusterTrustBundle:
-              signerName: row-major.net/spiffe
+              signerName: kube-agentic-networking.sigs.k8s.io/identity
               labelSelector:
                 matchLabels:
-                  "spiffe.row-major.net/canarying": "live"
-                  "spiffe.row-major.net/trust-domain": "cluster.local"
+                  "kube-agentic-networking.sigs.k8s.io/canarying":             "live"
+                  "kube-agentic-networking.sigs.k8s.io/workload-trust-domain": "cluster.local"
               path: trust-bundle.pem
           - podCertificate:
-              signerName: row-major.net/spiffe
+              signerName: kube-agentic-networking.sigs.k8s.io/identity
               keyType: ECDSAP256
               keyPath: tls.key
               certificateChainPath: tls.crt
