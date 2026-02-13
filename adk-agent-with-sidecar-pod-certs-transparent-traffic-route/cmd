@@ -1,0 +1,15 @@
+# TAG=v26
+# docker build -t hmeng/agent:$TAG .
+# docker push docker.io/hmeng/agent:$TAG
+
+ENVOY_CONFIG_FILE=agent_sidecar_spiffe.yaml
+K8S_CONFIG_FILE=deployment.yaml
+kubectl delete cm envoy-config -n agent-spiffe
+kubectl create configmap envoy-config --from-file=$ENVOY_CONFIG_FILE -n agent-spiffe
+kubectl delete -f $K8S_CONFIG_FILE
+kubectl delete -f spiffe-identity-configmap.yaml
+kubectl delete -f spiffe-trust-configmap.yaml
+sleep 10
+kubectl apply -f spiffe-identity-configmap.yaml
+kubectl apply -f spiffe-trust-configmap.yaml
+kubectl apply -f $K8S_CONFIG_FILE

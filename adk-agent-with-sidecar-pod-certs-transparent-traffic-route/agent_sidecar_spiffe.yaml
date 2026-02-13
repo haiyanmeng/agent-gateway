@@ -1,0 +1,103 @@
+node:
+  id: "envoy-sds-node"
+  cluster: "envoy-sds-cluster"
+
+static_resources:
+  listeners:
+    # Listener for the internal service (Port 9000)
+    - name: listener_9000
+      address:
+        socket_address: { address: 127.0.0.1, port_value: 9000 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_9000
+                route_config:
+                  name: local_route_9000
+                  virtual_hosts:
+                    - name: mcp_calc_service
+                      domains:
+                        [
+                          "server1-svc.mcp-server-calculator-system.svc.cluster.local",
+                          "server1-svc.mcp-server-calculator-system.svc.cluster.local:9000",
+                        ]
+                      routes:
+                        - match: { path: "/mcp" }
+                          route:
+                            cluster: envoy-gateway
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      {
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router,
+                      }
+
+    # Listener for the deepwiki domain (Port 443)
+    - name: listener_443
+      address:
+        socket_address: { address: 127.0.0.1, port_value: 443 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_443
+                route_config:
+                  name: local_route_443
+                  virtual_hosts:
+                    - name: deepwiki_service
+                      domains: ["mcp.deepwiki.com", "mcp.deepwiki.com:443"]
+                      routes:
+                        - match: { path: "/mcp" }
+                          route:
+                            cluster: envoy-gateway
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      {
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router,
+                      }
+
+  clusters:
+    - name: envoy-gateway
+      type: LOGICAL_DNS
+      load_assignment:
+        cluster_name: envoy-gateway
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: envoy-service.envoy-gateway-system.svc.cluster.local
+                      port_value: 10001
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            tls_certificate_sds_secret_configs:
+              - name: "spiffe_identity"
+                sds_config:
+                  resource_api_version: V3
+                  path_config_source:
+                    { path: "/etc/envoy/sds/spiffe_identity.yaml" }
+            combined_validation_context:
+              default_validation_context:
+                match_typed_subject_alt_names:
+                  - san_type: URI
+                    matcher:
+                      {
+                        exact: "spiffe://cluster.local/ns/envoy-gateway-system/sa/envoy-sa",
+                      }
+              validation_context_sds_secret_config:
+                name: "spiffe_trust"
+                sds_config:
+                  resource_api_version: V3
+                  path_config_source:
+                    { path: "/etc/envoy/sds/spiffe_trust.yaml" }
+
+admin:
+  address:
+    socket_address: { address: 0.0.0.0, port_value: 9002 }

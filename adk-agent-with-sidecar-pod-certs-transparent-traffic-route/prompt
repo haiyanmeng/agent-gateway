@@ -1,0 +1,102 @@
+deployment.yaml includes a Deployment `adk-agent`, which includes two containers, adk-agent, and envoy. It also has an initContainer which transparently routes the agentic traffic from the agent container to the envoy sidecar. Howeve, the adk-agent container needs to be aware of the GATEWAY ADDRESS. For example, it calls http://{gateway_address}/mcp-server1/mcp. Is it possible to call the address of MCP-server1 directly in the agent container, and transparently route the MCP traffic to the gateway address?
+
+
+Yes, it is possible to call the address of mcp-server1 directly from the adk-agent container and have it transparently routed to the gateway via the Envoy sidecar.
+
+
+  To achieve this, you need to update the iptables rules to intercept traffic on port 80 and reconfigure Envoy to act as an HTTP proxy that routes based on the Host header and performs the necessary path and host rewrites.
+
+  1. Update deployment.yaml (Init Container)
+
+
+  Modify the proxy-init container to redirect outbound traffic on port 80 to Envoy (port 10001).
+
+
+    1       initContainers:
+    2         - name: proxy-init
+    3           # ...
+    4           command:
+    5             - sh
+    6             - -c
+    7             - |
+    8               apk add iptables
+    9               # Redirect outbound TCP traffic on port 80 (default HTTP) and 10001 to Envoy
+   10               iptables -t nat -A OUTPUT -p tcp --dport 80 -m owner ! --uid-owner 1337 -j REDIRECT --to-ports 10001
+   11               iptables -t nat -A OUTPUT -p tcp --dport 10001 -m owner ! --uid-owner 1337 -j REDIRECT --to-ports 10001
+
+
+  2. Update agent_sidecar_spiffe.yaml (Envoy Config)
+
+
+  Replace the tcp_proxy with an http_connection_manager. This allows Envoy to inspect the Host header and rewrite the path from /mcp to /mcp-server1/mcp.
+
+
+    1     filter_chains:
+    2       - filters:
+    3         - name: envoy.filters.network.http_connection_manager
+    4           typed_config:
+    5             "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+    6             stat_prefix: ingress_http
+    7             route_config:
+    8               name: local_route
+    9               virtual_hosts:
+   10               - name: mcp_server1
+   11                 domains: ["mcp-server1", "mcp-server1:*"]
+   12                 routes:
+   13                 - match: { prefix: "/mcp" }
+   14                   route:
+   15                     cluster: envoy-gateway
+   16                     prefix_rewrite: "/mcp-server1/mcp"
+   17                     # Optional: rewrite Host header if the gateway requires it
+   18                     host_rewrite_literal: "envoy-service.envoy-gateway-system.svc.cluster.local:10001"
+   19               - name: mcp_server2
+   20                 domains: ["mcp-server2", "mcp-server2:*"]
+   21                 routes:
+   22                 - match: { prefix: "/mcp" }
+   23                   route:
+   24                     cluster: envoy-gateway
+   25                     prefix_rewrite: "/mcp-server2/mcp"
+   26                     host_rewrite_literal: "envoy-service.envoy-gateway-system.svc.cluster.local:10001"
+   27             http_filters:
+   28             - name: envoy.filters.http.router
+   29               typed_config:
+   30                 "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+
+  3. DNS Resolution
+
+
+  The agent container must be able to resolve the hostnames mcp-server1 and mcp-server2. The simplest way to do this in Kubernetes is to create a Service for each, even if it's just a dummy service (e.g., an ExternalName or a ClusterIP service with no selector).
+
+
+    1 apiVersion: v1
+    2 kind: Service
+    3 metadata:
+    4   name: mcp-server1
+    5   namespace: agent-spiffe
+    6 spec:
+    7   ports:
+    8   - port: 80
+    9 ---
+   10 apiVersion: v1
+   11 kind: Service
+   12 metadata:
+   13   name: mcp-server2
+   14   namespace: agent-spiffe
+   15 spec:
+   16   ports:
+   17   - port: 80
+
+
+  Once these changes are applied, you can update your agent code to use the direct addresses:
+
+
+   1 local_mcp = McpToolset(
+   2     connection_params=StreamableHTTPConnectionParams(
+   3         url="http://mcp-server1/mcp",
+   4     ),
+   5 )
+
+
+  Envoy will intercept the request, see the Host: mcp-server1 header, rewrite the path to /mcp-server1/mcp, and forward it to the gateway using the configured SPIFFE/mTLS identity.
+
